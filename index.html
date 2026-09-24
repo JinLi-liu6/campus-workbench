@@ -221,6 +221,16 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
         <div class="stat g2"><div class="n" id="s_stu">0</div><div class="t">在读学生数</div><div class="d" id="s_stu_d"></div></div>
       </div>
 
+      <div class="card">
+        <h3>按学几科统计 <span class="tag">单科 / 双科 / 三科及以上 · 科目总数</span></h3>
+        <div class="grid g3" style="margin-bottom:12px">
+          <div class="stat b2"><div class="n" id="s_k1">0</div><div class="t">单科学生科目数</div><div class="d" id="s_k1_d">0 人</div></div>
+          <div class="stat b1"><div class="n" id="s_k2">0</div><div class="t">双科学生科目数</div><div class="d" id="s_k2_d">0 人</div></div>
+          <div class="stat g1"><div class="n" id="s_k3">0</div><div class="t">三科及以上科目数</div><div class="d" id="s_k3_d">0 人</div></div>
+        </div>
+        <div id="byKNDist"></div>
+      </div>
+
       <div class="grid g2">
         <div class="card">
           <h3>按科目统计 <span class="tag">不同科目不同颜色</span></h3>
@@ -676,6 +686,30 @@ function renderHome(){
   document.getElementById('s_act_d').textContent = '占 ' + pct(act, cs.length) + '%';
   document.getElementById('s_stu').textContent = Object.keys(stuIds).length;
   document.getElementById('s_stu_d').textContent = '人均 ' + (Object.keys(stuIds).length? (cs.length/Object.keys(stuIds).length).toFixed(2):0) + ' 门';
+
+  // 按学几科分组统计科目总数（单科 / 双科 / 三科及以上）
+  var perStu = {};
+  cs.forEach(function(c){
+    var g = perStu[c.studentId] || (perStu[c.studentId] = {subs:{}, c:0});
+    g.subs[c.subject] = 1; g.c++;
+  });
+  var kG = {1:{n:0,c:0}, 2:{n:0,c:0}, 3:{n:0,c:0}};
+  Object.keys(perStu).forEach(function(id){
+    var g = perStu[id], k = Object.keys(g.subs).length; if(k>3) k=3;
+    kG[k].n++; kG[k].c += g.c;
+  });
+  ['1','2','3'].forEach(function(k){
+    document.getElementById('s_k'+k).textContent = kG[k].c;
+    document.getElementById('s_k'+k+'_d').textContent = kG[k].n + ' 人 · 占科目数 ' + pct(kG[k].c, cs.length) + '%';
+  });
+  var kc = {1:'#f2a63b', 2:'#7b5cd6', 3:'#17915f'};
+  var kl = {1:'单科', 2:'双科', 3:'三科及以上'};
+  var maxK = Math.max(1, kG[1].c, kG[2].c, kG[3].c);
+  document.getElementById('byKNDist').innerHTML = ['1','2','3'].map(function(k){
+    return '<div class="bar-row"><span class="lb">'+kl[k]+'</span>'+
+      '<span class="bar"><i style="width:'+(kG[k].c/maxK*100)+'%;background:'+kc[k]+'"></i></span>'+
+      '<span class="vv">'+kG[k].c+' 门 · '+kG[k].n+' 人</span></div>';
+  }).join('') + '<div class="mini" style="margin-top:8px">三类合计 '+(kG[1].c+kG[2].c+kG[3].c)+' 门，等于上方总科目数 '+cs.length+' 门；涉及 '+(kG[1].n+kG[2].n+kG[3].n)+' 名学生。</div>';
 
   // 按科目
   var byS = {}, maxS = 1;
