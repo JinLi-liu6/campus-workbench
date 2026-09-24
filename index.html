@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校区 AI 工作台</title>
+<style>
+:root{
+  --blue-900:#0b3d91; --blue-700:#1565c0; --blue-500:#2b8ae2; --blue-300:#7db9ef; --blue-100:#e8f2fd; --blue-50:#f4f9ff;
+  --green-700:#0f7a4f; --green-500:#17915f; --green-100:#e6f6ee;
+  --ink:#1b2733; --ink-2:#4a5a6a; --ink-3:#8a94a6;
+  --line:#dde7f2; --bg:#f2f7fd; --card:#ffffff;
+  --warn:#e05263; --warn-bg:#fdecee; --amber:#f2a63b;
+}
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:14px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:13px}
+input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
+.hide{display:none !important}
+
+/* ---------- 登录 ---------- */
+#login{position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,#0b3d91 0%,#1565c0 45%,#2b8ae2 100%)}
+.login-box{width:380px;background:#fff;border-radius:16px;padding:28px 26px;box-shadow:0 20px 50px rgba(11,61,145,.35)}
+.login-box h1{margin:0 0 4px;font-size:22px;color:var(--blue-900)}
+.login-box p.sub{margin:0 0 20px;color:var(--ink-3);font-size:12px}
+.login-box label{display:block;margin:12px 0 6px;font-size:12px;color:var(--ink-2)}
+.login-box input,.login-box select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fafcff}
+.login-box .btn{width:100%;margin-top:20px;padding:12px;background:var(--blue-700);color:#fff;border-radius:8px;font-size:15px;font-weight:600}
+.login-box .tip{margin-top:12px;font-size:11px;color:var(--ink-3);text-align:center;line-height:1.7}
+
+/* ---------- 布局 ---------- */
+#app{display:none}
+.topbar{background:linear-gradient(100deg,#0b3d91,#2b8ae2);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.topbar .brand{font-size:17px;font-weight:700;letter-spacing:.5px}
+.topbar .brand small{display:block;font-size:11px;font-weight:400;opacity:.8}
+.topbar .spacer{flex:1}
+.topbar .who{background:rgba(255,255,255,.16);padding:6px 12px;border-radius:20px;font-size:12px}
+.topbar button.ghost{background:rgba(255,255,255,.16);padding:6px 12px;border-radius:20px;font-size:12px;color:#fff}
+.topbar button.ghost:hover{background:rgba(255,255,255,.28)}
+nav.tabs{background:#fff;border-bottom:1px solid var(--line);padding:0 16px;display:flex;gap:2px;overflow-x:auto}
+nav.tabs button{padding:13px 18px;color:var(--ink-2);border-bottom:3px solid transparent;font-size:14px;white-space:nowrap}
+nav.tabs button.on{color:var(--blue-700);border-bottom-color:var(--blue-700);font-weight:600}
+.wrap{max-width:1280px;margin:0 auto;padding:18px 16px 60px}
+.page{display:none}.page.on{display:block}
+
+/* ---------- 卡片 ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h3{margin:0 0 12px;font-size:15px;color:var(--blue-900);display:flex;align-items:center;gap:8px}
+.card h3 .tag{font-size:11px;font-weight:400;color:var(--ink-3)}
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:900px){.g4,.g3,.g2{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.g4,.g3,.g2{grid-template-columns:1fr}}
+
+.stat{border-radius:12px;padding:14px 16px;color:#fff;position:relative;overflow:hidden}
+.stat.b1{background:linear-gradient(135deg,#0b3d91,#2b8ae2)}
+.stat.b2{background:linear-gradient(135deg,#1565c0,#4fa3ef)}
+.stat.g1{background:linear-gradient(135deg,#0f7a4f,#2fb87c)}
+.stat.g2{background:linear-gradient(135deg,#17915f,#5ccb98)}
+.stat .n{font-size:30px;font-weight:700;line-height:1.1}
+.stat .t{font-size:12px;opacity:.9;margin-top:4px}
+.stat .d{font-size:11px;opacity:.8;margin-top:2px}
+
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-row .lb{width:64px;font-size:13px;color:var(--ink-2);text-align:right;flex:none}
+.bar-row .bar{flex:1;height:16px;background:var(--blue-100);border-radius:8px;overflow:hidden}
+.bar-row .bar i{display:block;height:100%;border-radius:8px}
+.bar-row .vv{width:56px;font-size:13px;font-weight:600;color:var(--blue-900)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left}
+th{background:var(--blue-50);color:var(--blue-900);font-weight:600;font-size:12px;position:sticky;top:0}
+tbody tr:hover{background:var(--blue-50)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl-scroll{max-height:520px;overflow:auto}
+
+.chip{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;color:#fff;margin:2px 4px 2px 0;white-space:nowrap}
+.chip.ghost{background:#fff;color:var(--ink-2);border:1px solid var(--line)}
+.btn{padding:7px 14px;border-radius:8px;background:var(--blue-700);color:#fff;font-size:13px}
+.btn:hover{background:var(--blue-900)}
+.btn.g{background:var(--green-500)}.btn.g:hover{background:var(--green-700)}
+.btn.gray{background:#fff;color:var(--ink-2);border:1px solid var(--line)}
+.btn.sm{padding:4px 10px;font-size:12px}
+.btn.danger{background:var(--warn)}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ---------- 学生墙 ---------- */
+.stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.stu{background:#fff;border:1px solid var(--line);border-left:4px solid var(--blue-500);border-radius:10px;padding:10px 12px;cursor:pointer;transition:.18s}
+.stu:hover{box-shadow:0 4px 14px rgba(21,101,192,.16);transform:translateY(-1px)}
+.stu .nm{font-weight:600;font-size:14px}
+.stu .mt{font-size:11px;color:var(--ink-3);margin-top:2px}
+.stu .subs{margin-top:7px}
+.stu.dim{opacity:.22;filter:grayscale(.6)}
+.stu.hl{border-color:var(--blue-700);box-shadow:0 0 0 3px rgba(43,138,226,.25);opacity:1;filter:none;transform:scale(1.02)}
+#hlPanel{position:fixed;right:16px;bottom:16px;width:330px;background:#fff;border:1px solid var(--blue-300);border-radius:12px;
+  padding:14px;box-shadow:0 14px 40px rgba(11,61,145,.22);z-index:50;display:none}
+#hlPanel h4{margin:0 0 8px;font-size:15px;color:var(--blue-900)}
+#hlPanel .close{position:absolute;right:10px;top:8px;color:var(--ink-3);font-size:16px}
+#hlPanel .li{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+#hlPanel .li:last-child{border:none}
+
+/* ---------- 出勤 ---------- */
+.seg{display:inline-flex;background:var(--blue-100);border-radius:10px;padding:3px}
+.seg button{padding:7px 16px;border-radius:8px;color:var(--blue-900);font-size:13px}
+.seg button.on{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12);font-weight:600}
+.att-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.att{padding:9px 10px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;background:#fff}
+.att .nm{font-size:13px;font-weight:500}
+.att .st{font-size:11px;padding:3px 9px;border-radius:20px;color:#fff;flex:none}
+.st-出勤{background:var(--green-500)}.st-迟到{background:var(--amber)}.st-请假{background:#7f8c9b}.st-缺勤{background:var(--warn)}
+.att.s-出勤{border-color:var(--green-500)}
+.att.s-迟到{border-color:var(--amber)}
+.att.s-请假{border-color:#b6bfc9;opacity:.8}
+.att.s-缺勤{border-color:var(--warn);background:var(--warn-bg)}
+.rate-box{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.rate{font-size:34px;font-weight:700;color:var(--green-700)}
+.rate small{font-size:14px;color:var(--ink-3);font-weight:400}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar input,.toolbar select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.mini{font-size:11px;color:var(--ink-3)}
+.note{background:var(--blue-50);border-left:3px solid var(--blue-500);padding:10px 12px;border-radius:6px;font-size:12px;color:var(--ink-2);line-height:1.7;margin-bottom:12px}
+.empty{padding:26px;text-align:center;color:var(--ink-3);font-size:13px}
+textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;line-height:1.6}
+.switch{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+
+<!-- ============ 登录 ============ -->
+<div id="login">
+  <div class="login-box">
+    <h1>校区 AI 工作台</h1>
+    <p class="sub">科目数实时统计 · 出勤联动打卡</p>
+    <label>身份</label>
+    <select id="lgRole">
+      <option value="teacher">任课老师</option>
+      <option value="head">班主任（总控）</option>
+      <option value="master">校长（总控）</option>
+    </select>
+    <label>姓名</label>
+    <input id="lgName" placeholder="如：陶老师" autocomplete="off">
+    <label>密码</label>
+    <input id="lgPwd" type="password" placeholder="默认 123456" autocomplete="off">
+    <button class="btn" onclick="doLogin()">进入工作台</button>
+    <div class="tip">演示账号：陶老师 / 李老师 / 王老师 / 张老师 / 班主任 / 校长<br>默认密码统一 123456（可在「设置」里改）</div>
+  </div>
+</div>
+
+<!-- ============ 主应用 ============ -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand">校区 AI 工作台<small>科目数 · 出勤 · 总控看板</small></div>
+    <div class="spacer"></div>
+    <div class="who" id="who">—</div>
+    <button class="ghost" onclick="exportJSON()">导出数据</button>
+    <button class="ghost" onclick="doLogout()">退出</button>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-p="home" class="on">首页 · 科目数</button>
+    <button data-p="courses">课表 / 学生</button>
+    <button data-p="attend">出勤打卡</button>
+    <button data-p="dash">总控看板</button>
+    <button data-p="set">设置</button>
+  </nav>
+  <div class="wrap">
+
+    <!-- ---------- 首页 ---------- -->
+    <div class="page on" id="p-home">
+      <div class="note" id="scopeNote"></div>
+      <div class="grid g4" style="margin-bottom:14px">
+        <div class="stat b1"><div class="n" id="s_total">0</div><div class="t">总科目数（在读）</div><div class="d" id="s_total_d"></div></div>
+        <div class="stat b2"><div class="n" id="s_paid">0</div><div class="t">正价课科目数</div><div class="d" id="s_paid_d"></div></div>
+        <div class="stat g1"><div class="n" id="s_act">0</div><div class="t">活动课科目数</div><div class="d" id="s_act_d"></div></div>
+        <div class="stat g2"><div class="n" id="s_stu">0</div><div class="t">在读学生数</div><div class="d" id="s_stu_d"></div></div>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3>按科目统计 <span class="tag">不同科目不同颜色</span></h3>
+          <div id="bySubject"></div>
+        </div>
+        <div class="card">
+          <h3>按年级统计 <span class="tag">七 / 八 / 九年级</span></h3>
+          <div id="byGrade"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>科目 × 年级 交叉统计 <span class="tag">如：语文七年级 / 数学八年级 …</span></h3>
+        <div class="tbl-scroll"><table id="crossTbl"></table></div>
+      </div>
+
+      <div class="card">
+        <h3>退课 / 退费 <span class="tag">已从上方科目数中扣除</span></h3>
+        <div class="grid g2" style="margin-bottom:10px">
+          <div class="bar-row"><span class="lb">退课</span><span class="bar"><i style="width:0%;background:#7f8c9b"></i></span><span class="vv" id="s_drop">0</span></div>
+          <div class="bar-row"><span class="lb">退费</span><span class="bar"><i style="width:0%;background:var(--warn)"></i></span><span class="vv" id="s_refund">0</span></div>
+        </div>
+        <div class="tbl-scroll" style="max-height:220px"><table id="dropTbl"></table></div>
+      </div>
+
+      <div class="card">
+        <h3>学生卡片墙 <span class="tag">点一下 = 高亮该生在其他老师那里的课</span></h3>
+        <div class="toolbar">
+          <input id="qStu" placeholder="搜姓名 / 班级 / 老师" oninput="renderStudents()" style="min-width:220px">
+          <select id="fGrade" onchange="renderStudents()"><option value="">全部年级</option><option>七年级</option><option>八年级</option><option>九年级</option></select>
+          <select id="fSub" onchange="renderStudents()"><option value="">全部科目</option></select>
+          <span class="mini">共 <b id="stuCount">0</b> 人</span>
+          <button class="btn gray sm" onclick="clearHL()">取消高亮</button>
+        </div>
+        <div class="stu-grid" id="stuGrid"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 课表 ---------- -->
+    <div class="page" id="p-courses">
+      <div class="card">
+        <h3>课程明细 <span class="tag">改状态 → 首页科目数即时加减</span></h3>
+        <div class="toolbar">
+          <input id="qCourse" placeholder="搜学生 / 老师 / 科目" oninput="renderCourses()" style="min-width:220px">
+          <select id="fCtype" onchange="renderCourses()"><option value="">全部类型</option><option>正价</option><option>活动</option></select>
+          <select id="fCstatus" onchange="renderCourses()"><option value="在读">在读</option><option>退课</option><option>退费</option><option value="">全部状态</option></select>
+          <button class="btn sm" onclick="openAddCourse()">+ 新增一门课</button>
+        </div>
+        <div class="tbl-scroll"><table id="courseTbl"></table></div>
+      </div>
+
+      <div class="card">
+        <h3>晚自习 / 正课排班 <span class="tag">设定后出勤页自动带出应到名单</span></h3>
+        <div class="tbl-scroll" style="max-height:300px"><table id="schedTbl"></table></div>
+        <div class="toolbar" style="margin-top:10px">
+          <select id="scCls"></select>
+          <select id="scDay"><option>周一</option><option>周二</option><option>周三</option><option>周四</option><option>周五</option><option>周六</option><option>周日</option></select>
+          <input id="scSlot" placeholder="时段 如 18:30-20:30" style="width:150px">
+          <input id="scTeacher" placeholder="值班老师" style="width:110px">
+          <select id="scType"><option>晚自习</option><option>正课</option><option>送温暖</option></select>
+          <button class="btn g sm" onclick="addSchedule()">+ 添加排班</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 出勤 ---------- -->
+    <div class="page" id="p-attend">
+      <div class="card">
+        <h3>今日出勤打卡 <span class="tag">默认全员出勤，点一下改状态</span></h3>
+        <div class="toolbar">
+          <input type="date" id="attDate" onchange="renderAttend()">
+          <div class="seg" id="attSeg">
+            <button data-s="正课" class="on">正课出勤</button>
+            <button data-s="晚自习">晚自习出勤</button>
+            <button data-s="送温暖">送温暖出勤</button>
+          </div>
+          <select id="attTeacher" onchange="renderAttend()"></select>
+          <button class="btn gray sm" onclick="setAll('出勤')">全部出勤</button>
+          <span class="mini" id="attSrc"></span>
+        </div>
+        <div class="rate-box" style="margin-bottom:14px">
+          <div class="rate"><span id="rateV">0%</span> <small>出勤率</small></div>
+          <div class="mini" id="rateDetail"></div>
+        </div>
+        <div class="att-list" id="attList"></div>
+      </div>
+
+      <div class="card">
+        <h3>本周出勤汇总 <span class="tag">正课 / 晚自习 / 送温暖</span></h3>
+        <div class="tbl-scroll" style="max-height:300px"><table id="weekTbl"></table></div>
+      </div>
+    </div>
+
+    <!-- ---------- 总控看板 ---------- -->
+    <div class="page" id="p-dash">
+      <div class="note" id="dashNote"></div>
+      <div class="card">
+        <h3>各老师出勤汇总 <span class="tag">所有老师打卡结果汇总</span></h3>
+        <div class="toolbar">
+          <select id="dashRange" onchange="renderDash()">
+            <option value="today">今日</option><option value="week">本周</option><option value="month">本月</option><option value="all">全部</option>
+          </select>
+          <select id="dashSession" onchange="renderDash()">
+            <option value="">全部场次</option><option>正课</option><option>晚自习</option><option>送温暖</option>
+          </select>
+          <button class="btn gray sm" onclick="exportAttendCSV()">导出出勤明细 CSV</button>
+        </div>
+        <div class="tbl-scroll"><table id="dashTbl"></table></div>
+      </div>
+      <div class="card">
+        <h3>各老师科目数汇总</h3>
+        <div class="tbl-scroll"><table id="dashCourseTbl"></table></div>
+      </div>
+      <div class="card">
+        <h3>近 7 天出勤率趋势</h3>
+        <div id="trend"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 设置 ---------- -->
+    <div class="page" id="p-set">
+      <div class="card">
+        <h3>导入课表 <span class="tag">从 Excel 直接复制粘贴（姓名 年级 班级 科目 类型 老师 星期 时段 教室）</span></h3>
+        <div class="note">支持 Excel / 表格整块复制。第一行是表头会自动跳过。列顺序按上面的默认顺序，也可在下面手动指定分隔符：制表符（Excel 默认）或逗号。<br>类型填「正价」或「活动」；年级写「七年级 / 八年级 / 九年级」或「7 / 8 / 9」。</div>
+        <textarea class="import" id="impText" placeholder="粘贴课表…"></textarea>
+        <div class="toolbar" style="margin-top:10px">
+          <select id="impSep"><option value="\t">制表符（Excel 复制）</option><option value=",">逗号 CSV</option></select>
+          <label class="switch"><input type="checkbox" id="impClear"> 清空旧数据后导入</label>
+          <button class="btn" onclick="doImport()">导入</button>
+          <button class="btn gray" onclick="downloadTemplate()">下载模板</button>
+        </div>
+        <div id="impMsg" class="mini" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <h3>科目颜色 <span class="tag">一科一色，学生卡片同步显示</span></h3>
+        <div id="colorBox" class="grid g3"></div>
+      </div>
+
+      <div class="card">
+        <h3>账号管理 <span class="tag">班主任 / 校长为总控权限</span></h3>
+        <div class="tbl-scroll" style="max-height:240px"><table id="accTbl"></table></div>
+        <div class="toolbar" style="margin-top:10px">
+          <input id="acName" placeholder="姓名" style="width:110px">
+          <select id="acRole"><option value="teacher">任课老师</option><option value="head">班主任</option><option value="master">校长</option></select>
+          <input id="acPwd" placeholder="密码" style="width:110px" value="123456">
+          <button class="btn g sm" onclick="addAccount()">+ 新增账号</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>数据</h3>
+        <div class="row-actions">
+          <button class="btn" onclick="exportJSON()">导出全部数据（JSON 备份）</button>
+          <button class="btn gray" onclick="document.getElementById('fileIn').click()">导入 JSON 备份</button>
+          <input type="file" id="fileIn" class="hide" accept=".json" onchange="importJSON(this)">
+          <button class="btn gray" onclick="loadSeed()">载入示例数据</button>
+          <button class="btn danger" onclick="clearAll()">清空全部数据</button>
+        </div>
+        <div class="mini" style="margin-top:10px;line-height:1.8">
+          数据保存在本机浏览器（localStorage），不上传服务器、不联网。多设备同步请用「导出 JSON → 另一台导入」。<br>
+          如需真正多人实时联动（老师手机打卡、校长网页实时看到），需要配一个后端数据库 —— 这一步等你确认要不要上。
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="hlPanel">
+  <button class="close" onclick="clearHL()">×</button>
+  <h4 id="hlName"></h4>
+  <div id="hlBody"></div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+var LS = 'ai_workbench_v1';
+var SUBJ_COLORS = {数学:'#2b8ae2',语文:'#17915f',英语:'#f2a63b',物理:'#7b5cd6',化学:'#e05263',生物:'#0fa3a3',
+  历史:'#c2882a',地理:'#3aa0d1',政治:'#d1558f',其他:'#8a94a6'};
+var DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+var DB = null, ME = null, ATT_SESSION = '正课', HL = null;
+
+function uid(){ return 'x'+Math.random().toString(36).slice(2,9); }
+function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dayName(dateStr){ var d=new Date(dateStr+'T00:00:00'); return DAYS[(d.getDay()+6)%7]; }
+function weekStart(dateStr){ var d=new Date(dateStr+'T00:00:00'); var w=(d.getDay()+6)%7; d.setDate(d.getDate()-w);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function save(){ try{ localStorage.setItem(LS, JSON.stringify(DB)); }catch(e){ alert('保存失败：'+e.message); } }
+function load(){
+  var raw = localStorage.getItem(LS);
+  if(raw){ try{ DB = JSON.parse(raw); }catch(e){ DB = null; } }
+  if(!DB || !DB.students){ DB = seed(); save(); }
+  if(!DB.subjectColors) DB.subjectColors = {};
+  if(!DB.accounts) DB.accounts = [];
+  if(!DB.schedule) DB.schedule = [];
+  if(!DB.attendance) DB.attendance = [];
+}
+
+/* ================= 示例数据 ================= */
+function seed(){
+  var teachers = ['陶老师','李老师','王老师','张老师'];
+  var subs = {陶老师:'数学',李老师:'语文',王老师:'英语',张老师:'物理'};
+  var stus = [], courses = [];
+  var names = ['陈子昂','李思远','王一诺','张若曦','刘梓涵','黄子谦','周雨桐','吴俊熙','郑安然','孙嘉懿','马晨曦','胡博文','林清越','何书瑶','高远航','罗嘉宁','梁诗涵','宋泽楷','唐悦然','许文昊','韩雨萱','冯思睿','邓佳琪','曹宇轩','彭子墨','曾一鸣','谢明轩','董思远','吕佳怡','苏子航'];
+  var grades = ['七年级','八年级','九年级'];
+  for(var i=0;i<names.length;i++){
+    var g = grades[i%3];
+    var sid = uid();
+    stus.push({id:sid, name:names[i], grade:g, cls:g+'·'+(1+(i%4))+'班', school:'示例学校', owner:teachers[i%4]});
+    var n = 1 + (i%3); // 1~3 门
+    var picked = {};
+    for(var k=0;k<n;k++){
+      var t = teachers[(i+k)%4];
+      var subj = subs[t];
+      if(picked[t]) continue; picked[t]=1;
+      courses.push({id:uid(), studentId:sid, subject:subj, ctype:(i%5===0?'活动':'正价'), teacher:t,
+        weekday:DAYS[(i+k)%7], slot:['08:00-09:30','10:00-11:30','14:00-15:30','16:00-17:30','18:30-20:00'][(i+k)%5],
+        room:'A'+(101+k), status:'在读'});
+    }
+  }
+  // 制造 2 个退课、1 个退费
+  if(courses[3]) courses[3].status='退课';
+  if(courses[7]) courses[7].status='退课';
+  if(courses[11]) courses[11].status='退费';
+  var sched = [];
+  var clsList = ['七年级·1班','八年级·2班','九年级·3班'];
+  for(var d=0; d<5; d++){
+    sched.push({id:uid(), cls:clsList[d%3], weekday:DAYS[d], slot:'18:30-20:30', teacher:teachers[d%4], stype:'晚自习'});
+  }
+  return {
+    students: stus, courses: courses, schedule: sched, attendance: [],
+    accounts: [{id:uid(),name:'陶老师',role:'teacher',pwd:'123456'},{id:uid(),name:'李老师',role:'teacher',pwd:'123456'},
+      {id:uid(),name:'王老师',role:'teacher',pwd:'123456'},{id:uid(),name:'张老师',role:'teacher',pwd:'123456'},
+      {id:uid(),name:'班主任',role:'head',pwd:'123456'},{id:uid(),name:'校长',role:'master',pwd:'123456'}],
+    subjectColors: {}
+  };
+}
+
+/* ================= 登录 ================= */
+function doLogin(){
+  var name = document.getElementById('lgName').value.trim();
+  var pwd = document.getElementById('lgPwd').value.trim() || '123456';
+  var role = document.getElementById('lgRole').value;
+  if(!name){ alert('请输入姓名'); return; }
+  var acc = DB.accounts.filter(function(a){ return a.name===name; })[0];
+  if(!acc){ if(!confirm('没有找到账号「'+name+'」，要用当前身份新建一个吗？')) return;
+    acc = {id:uid(), name:name, role:role, pwd:pwd}; DB.accounts.push(acc); save(); }
+  else if(acc.pwd && acc.pwd !== pwd){ alert('密码不对'); return; }
+  ME = acc;
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('who').textContent = acc.name + ' · ' + ({teacher:'任课老师',head:'班主任',master:'校长'})[acc.role];
+  initUI();
+}
+function doLogout(){ ME=null; document.getElementById('login').style.display='flex'; document.getElementById('app').style.display='none'; }
+function isBoss(){ return ME && (ME.role==='head'||ME.role==='master'); }
+
+/* ================= 通用 ================= */
+function subColor(s){ return (DB.subjectColors && DB.subjectColors[s]) || SUBJ_COLORS[s] || '#8a94a6'; }
+function stuById(id){ return DB.students.filter(function(s){ return s.id===id; })[0]; }
+function activeCourses(){
+  var list = DB.courses.filter(function(c){ return c.status==='在读'; });
+  if(!isBoss()) list = list.filter(function(c){ return c.teacher===ME.name; });
+  return list;
+}
+function gradeKey(g){ if(!g) return '未分年级'; g=String(g); if(g.indexOf('7')===0||g.indexOf('七')>=0) return '七年级';
+  if(g.indexOf('8')===0||g.indexOf('八')>=0) return '八年级'; if(g.indexOf('9')===0||g.indexOf('九')>=0) return '九年级'; return '其他'; }
+function pct(a,b){ return b>0 ? Math.round(a/b*100) : 0; }
+
+/* ================= 导航 ================= */
+function initUI(){
+  document.querySelectorAll('#tabs button').forEach(function(b){
+    b.classList.toggle('on', b.dataset.p==='home');
+  });
+  showPage('home');
+  fillSelects();
+  renderAll();
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest('#tabs button'); if(t){ showPage(t.dataset.p); return; }
+  var s = e.target.closest('#attSeg button');
+  if(s){ document.querySelectorAll('#attSeg button').forEach(function(x){ x.classList.remove('on'); });
+    s.classList.add('on'); ATT_SESSION = s.dataset.s; renderAttend(); }
+});
+function showPage(p){
+  document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.p===p); });
+  document.querySelectorAll('.page').forEach(function(d){ d.classList.toggle('on', d.id==='p-'+p); });
+  if(p==='home') renderHome();
+  if(p==='courses'){ renderCourses(); renderSchedule(); }
+  if(p==='attend') renderAttend();
+  if(p==='dash') renderDash();
+  if(p==='set'){ renderColors(); renderAccounts(); }
+}
+function renderAll(){ renderHome(); renderCourses(); renderSchedule(); renderAttend(); renderDash(); }
+
+/* ================= 首页统计 ================= */
+function renderHome(){
+  var cs = activeCourses();
+  var scope = isBoss() ? '当前口径：全校（总控权限）' : '当前口径：只统计「'+ME.name+'」名下的课';
+  document.getElementById('scopeNote').innerHTML = scope + '　｜　数据日期：' + today() + '　｜　课表发来后可在「设置 → 导入课表」一键替换。';
+
+  var paid = cs.filter(function(c){ return c.ctype==='正价'; }).length;
+  var act  = cs.filter(function(c){ return c.ctype==='活动'; }).length;
+  var all  = DB.courses.filter(function(c){ return c.status==='在读'; });
+  var stuIds = {}; cs.forEach(function(c){ stuIds[c.studentId]=1; });
+
+  document.getElementById('s_total').textContent = cs.length;
+  document.getElementById('s_total_d').textContent = '全校在读 '+all.length+' 门';
+  document.getElementById('s_paid').textContent = paid;
+  document.getElementById('s_paid_d').textContent = '占 ' + pct(paid, cs.length) + '%';
+  document.getElementById('s_act').textContent = act;
+  document.getElementById('s_act_d').textContent = '占 ' + pct(act, cs.length) + '%';
+  document.getElementById('s_stu').textContent = Object.keys(stuIds).length;
+  document.getElementById('s_stu_d').textContent = '人均 ' + (Object.keys(stuIds).length? (cs.length/Object.keys(stuIds).length).toFixed(2):0) + ' 门';
+
+  // 按科目
+  var byS = {}, maxS = 1;
+  cs.forEach(function(c){ byS[c.subject]=(byS[c.subject]||0)+1; if(byS[c.subject]>maxS) maxS=byS[c.subject]; });
+  var hs = Object.keys(byS).sort(function(a,b){ return byS[b]-byS[a]; }).map(function(s){
+    return '<div class="bar-row"><span class="lb">'+s+'</span><span class="bar"><i style="width:'+(byS[s]/maxS*100)+'%;background:'+subColor(s)+'"></i></span><span class="vv">'+byS[s]+' 门</span></div>';
+  }).join('');
+  document.getElementById('bySubject').innerHTML = hs || '<div class="empty">暂无数据</div>';
+
+  // 按年级
+  var byG = {'七年级':0,'八年级':0,'九年级':0,'其他':0}, maxG=1;
+  cs.forEach(function(c){ var s=stuById(c.studentId); var g=gradeKey(s?s.grade:''); byG[g]=(byG[g]||0)+1; if(byG[g]>maxG) maxG=byG[g]; });
+  var gc = {'七年级':'#2b8ae2','八年级':'#17915f','九年级':'#f2a63b','其他':'#8a94a6'};
+  document.getElementById('byGrade').innerHTML = Object.keys(byG).filter(function(g){ return byG[g]>0; }).map(function(g){
+    return '<div class="bar-row"><span class="lb">'+g+'</span><span class="bar"><i style="width:'+(byG[g]/maxG*100)+'%;background:'+gc[g]+'"></i></span><span class="vv">'+byG[g]+' 门</span></div>';
+  }).join('') || '<div class="empty">暂无数据</div>';
+
+  // 交叉表
+  var subs = Object.keys(byS).sort(function(a,b){ return byS[b]-byS[a]; });
+  var grades = ['七年级','八年级','九年级'];
+  var cross = {};
+  cs.forEach(function(c){ var s=stuById(c.studentId); var g=gradeKey(s?s.grade:''); cross[c.subject+'|'+g]=(cross[c.subject+'|'+g]||0)+1; });
+  var h = '<thead><tr><th>科目</th>' + grades.map(function(g){ return '<th class="num">'+g+'</th>'; }).join('') + '<th class="num">合计</th></tr></thead><tbody>';
+  var colSum = {七年级:0,八年级:0,九年级:0}, grand=0;
+  subs.forEach(function(s){
+    var row=0;
+    h += '<tr><td><span class="chip" style="background:'+subColor(s)+'">'+s+'</span></td>';
+    grades.forEach(function(g){ var v=cross[s+'|'+g]||0; row+=v; colSum[g]+=v;
+      h += '<td class="num">'+(v?'<b>'+v+'</b>':'<span style="color:#c3cbd6">-</span>')+'</td>'; });
+    grand+=row; h += '<td class="num"><b>'+row+'</b></td></tr>';
+  });
+  h += '<tr style="background:var(--blue-50);font-weight:600"><td>合计</td>' + grades.map(function(g){ return '<td class="num">'+colSum[g]+'</td>'; }).join('') + '<td class="num">'+grand+'</td></tr>';
+  document.getElementById('crossTbl').innerHTML = h + '</tbody>';
+
+  // 退课退费
+  var drops = DB.courses.filter(function(c){ return c.status!=='在读' && (isBoss()||c.teacher===ME.name); });
+  var nDrop = drops.filter(function(c){ return c.status==='退课'; }).length;
+  var nRef  = drops.filter(function(c){ return c.status==='退费'; }).length;
+  document.getElementById('s_drop').textContent = nDrop + ' 门';
+  document.getElementById('s_refund').textContent = nRef + ' 门';
+  document.getElementById('dropTbl').innerHTML = '<thead><tr><th>学生</th><th>科目</th><th>老师</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+    (drops.length ? drops.map(function(c){ var s=stuById(c.studentId);
+      return '<tr><td>'+esc(s?s.name:'(已删)')+'</td><td><span class="chip" style="background:'+subColor(c.subject)+'">'+c.subject+'</span></td><td>'+esc(c.teacher)+'</td><td>'+c.ctype+'</td><td>'+c.status+'</td>'+
+      '<td><button class="btn g sm" onclick="restoreCourse(\''+c.id+'\')">恢复在读</button></td></tr>'; }).join('')
+      : '<tr><td colspan="6" class="empty">暂无退课 / 退费</td></tr>') + '</tbody>';
+
+  renderStudents();
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+
+/* ---------- 学生墙 + 高亮 ---------- */
+function renderStudents(){
+  var q = (document.getElementById('qStu').value||'').trim();
+  var fg = document.getElementById('fGrade').value;
+  var fs = document.getElementById('fSub').value;
+  var cs = activeCourses();
+  var map = {};
+  cs.forEach(function(c){ (map[c.studentId]=map[c.studentId]||[]).push(c); });
+  var list = DB.students.filter(function(s){ return map[s.id]; });
+  if(!isBoss()) list = list.filter(function(s){ return map[s.id].some(function(c){ return c.teacher===ME.name; }); });
+  if(q) list = list.filter(function(s){ var c=map[s.id]||[];
+    return s.name.indexOf(q)>=0 || (s.cls||'').indexOf(q)>=0 || c.some(function(x){ return x.teacher.indexOf(q)>=0; }); });
+  if(fg) list = list.filter(function(s){ return gradeKey(s.grade)===fg; });
+  if(fs) list = list.filter(function(s){ return (map[s.id]||[]).some(function(c){ return c.subject===fs; }); });
+
+  document.getElementById('stuCount').textContent = list.length;
+  document.getElementById('stuGrid').innerHTML = list.map(function(s){
+    var cs2 = map[s.id]||[];
+    var chips = cs2.map(function(c){ return '<span class="chip" style="background:'+subColor(c.subject)+'">'+esc(c.subject)+'·'+esc(c.teacher)+'</span>'; }).join('');
+    return '<div class="stu'+(HL===s.id?' hl':'')+(HL&&HL!==s.id?' dim':'')+'" onclick="setHL(\''+s.id+'\')">'+
+      '<div class="nm">'+esc(s.name)+' <span class="mini">'+gradeKey(s.grade)+'</span></div>'+
+      '<div class="mt">'+esc(s.cls||'')+' · '+cs2.length+' 门</div><div class="subs">'+chips+'</div></div>';
+  }).join('') || '<div class="empty">没有匹配的学生</div>';
+}
+function setHL(id){
+  HL = (HL===id) ? null : id;
+  renderStudents();
+  var p = document.getElementById('hlPanel');
+  if(!HL){ p.style.display='none'; return; }
+  var s = stuById(HL); var cs = DB.courses.filter(function(c){ return c.studentId===HL && c.status==='在读'; });
+  document.getElementById('hlName').textContent = s.name + '（' + gradeKey(s.grade) + ' · ' + (s.cls||'') + '）';
+  document.getElementById('hlBody').innerHTML = cs.length ? cs.map(function(c){
+      return '<div class="li"><span><span class="chip" style="background:'+subColor(c.subject)+'">'+esc(c.subject)+'</span></span>'+
+        '<span style="text-align:right"><b>'+esc(c.teacher)+'</b><br><span class="mini">'+c.ctype+' · '+esc(c.weekday||'')+' '+esc(c.slot||'')+' · '+esc(c.room||'')+'</span></span></div>';
+    }).join('') : '<div class="mini">该生暂无在读课程</div>';
+  p.style.display='block';
+}
+function clearHL(){ HL=null; renderStudents(); document.getElementById('hlPanel').style.display='none'; }
+
+/* ================= 课表页 ================= */
+function renderCourses(){
+  var q=(document.getElementById('qCourse').value||'').trim();
+  var ft=document.getElementById('fCtype').value, fs=document.getElementById('fCstatus').value;
+  var list = DB.courses.filter(function(c){ return isBoss()||c.teacher===ME.name; });
+  if(ft) list=list.filter(function(c){ return c.ctype===ft; });
+  if(fs) list=list.filter(function(c){ return c.status===fs; });
+  if(q){ list=list.filter(function(c){ var s=stuById(c.studentId);
+    return (s&&s.name.indexOf(q)>=0)||c.teacher.indexOf(q)>=0||c.subject.indexOf(q)>=0; }); }
+  document.getElementById('courseTbl').innerHTML =
+    '<thead><tr><th>学生</th><th>年级/班级</th><th>科目</th><th>类型</th><th>老师</th><th>时间</th><th>教室</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
+    (list.length? list.map(function(c){ var s=stuById(c.studentId);
+      return '<tr><td>'+esc(s?s.name:'-')+'</td><td>'+gradeKey(s?s.grade:'')+' '+esc(s?s.cls:'')+'</td>'+
+        '<td><span class="chip" style="background:'+subColor(c.subject)+'">'+esc(c.subject)+'</span></td><td>'+c.ctype+'</td><td>'+esc(c.teacher)+'</td>'+
+        '<td>'+esc(c.weekday||'')+' '+esc(c.slot||'')+'</td><td>'+esc(c.room||'')+'</td>'+
+        '<td>'+(c.status==='在读'?'<span style="color:var(--green-700)">在读</span>':'<span style="color:var(--warn)">'+c.status+'</span>')+'</td>'+
+        '<td><div class="row-actions">'+
+          (c.status==='在读'? '<button class="btn gray sm" onclick="setStatus(\''+c.id+'\',\'退课\')">退课</button><button class="btn danger sm" onclick="setStatus(\''+c.id+'\',\'退费\')">退费</button>'
+            : '<button class="btn g sm" onclick="setStatus(\''+c.id+'\',\'在读\')">恢复</button>')+
+          '<button class="btn gray sm" onclick="delCourse(\''+c.id+'\')">删除</button></div></td></tr>'; }).join('')
+      : '<tr><td colspan="9" class="empty">暂无课程</td></tr>')+'</tbody>';
+}
+function setStatus(id, st){ var c=DB.courses.filter(function(x){return x.id===id;})[0]; if(c){ c.status=st; save(); renderAll(); } }
+function restoreCourse(id){ setStatus(id,'在读'); }
+function delCourse(id){ if(!confirm('确定删除这门课？')) return; DB.courses=DB.courses.filter(function(c){return c.id!==id;}); save(); renderAll(); }
+function openAddCourse(){
+  var n = prompt('新增课程，格式：学生姓名,科目,类型(正价/活动),老师,星期,时段,教室\n例：陈子昂,数学,正价,陶老师,周六,10:00-11:30,A101');
+  if(!n) return;
+  var p = n.split(/[,，\s]+/).filter(Boolean);
+  if(p.length<3){ alert('格式不完整'); return; }
+  var st = DB.students.filter(function(s){ return s.name===p[0]; })[0];
+  if(!st){ alert('找不到学生「'+p[0]+'」，请先在课表里导入该学生'); return; }
+  DB.courses.push({id:uid(), studentId:st.id, subject:p[1], ctype:(p[2]||'正价'), teacher:p[3]||ME.name,
+    weekday:p[4]||'', slot:p[5]||'', room:p[6]||'', status:'在读'});
+  save(); renderAll(); alert('已新增');
+}
+function renderSchedule(){
+  document.getElementById('schedTbl').innerHTML = '<thead><tr><th>班级</th><th>星期</th><th>时段</th><th>值班老师</th><th>类型</th><th>操作</th></tr></thead><tbody>'+
+    (DB.schedule.length? DB.schedule.map(function(s){
+      return '<tr><td>'+esc(s.cls)+'</td><td>'+esc(s.weekday)+'</td><td>'+esc(s.slot)+'</td><td>'+esc(s.teacher)+'</td><td>'+esc(s.stype)+'</td>'+
+        '<td><button class="btn gray sm" onclick="delSchedule(\''+s.id+'\')">删除</button></td></tr>'; }).join('')
+      : '<tr><td colspan="6" class="empty">暂无排班，请在下方添加（班主任/校长也可以直接导入）</td></tr>')+'</tbody>';
+}
+function addSchedule(){
+  var o={id:uid(), cls:document.getElementById('scCls').value, weekday:document.getElementById('scDay').value,
+    slot:document.getElementById('scSlot').value.trim(), teacher:document.getElementById('scTeacher').value.trim()||ME.name,
+    stype:document.getElementById('scType').value};
+  if(!o.slot){ alert('请填时段'); return; }
+  DB.schedule.push(o); save(); renderSchedule(); renderAttend();
+}
+function delSchedule(id){ DB.schedule=DB.schedule.filter(function(s){return s.id!==id;}); save(); renderSchedule(); renderAttend(); }
+
+/* ================= 出勤 ================= */
+function fillSelects(){
+  var ts = {};
+  DB.courses.forEach(function(c){ if(c.status==='在读') ts[c.teacher]=1; });
+  DB.accounts.forEach(function(a){ ts[a.name]=1; });
+  var names = Object.keys(ts);
+  var sel = document.getElementById('attTeacher');
+  var cur = sel.value;
+  sel.innerHTML = (isBoss()? '<option value="">全部老师（总控代打）</option>':'') + names.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+  if(isBoss()) sel.value = cur || ''; else { sel.value = ME.name; sel.disabled = true; }
+  if(!isBoss() && cur!==ME.name) sel.value = ME.name;
+
+  var cs = {}; DB.students.forEach(function(s){ if(s.cls) cs[s.cls]=1; });
+  document.getElementById('scCls').innerHTML = Object.keys(cs).map(function(c){ return '<option>'+esc(c)+'</option>'; }).join('') || '<option>七年级·1班</option>';
+
+  var fs = document.getElementById('fSub'); var keep = fs.value;
+  var subs = {}; DB.courses.forEach(function(c){ subs[c.subject]=1; });
+  fs.innerHTML = '<option value="">全部科目</option>' + Object.keys(subs).map(function(s){ return '<option>'+s+'</option>'; }).join('');
+  fs.value = keep;
+  if(!document.getElementById('attDate').value) document.getElementById('attDate').value = today();
+}
+function attendTeacher(){ return isBoss() ? (document.getElementById('attTeacher').value||'') : ME.name; }
+function roster(dateStr, session, teacher){
+  var day = dayName(dateStr), out = [];
+  if(session==='正课'){
+    DB.courses.filter(function(c){ return c.status==='在读' && c.weekday===day && (!teacher||c.teacher===teacher); })
+      .forEach(function(c){ out.push({studentId:c.studentId, teacher:c.teacher, tag:c.subject+' '+c.slot}); });
+  }else if(session==='晚自习'){
+    var cls = DB.schedule.filter(function(s){ return s.stype==='晚自习' && s.weekday===day && (!teacher||s.teacher===teacher); })
+      .map(function(s){ return s.cls; });
+    DB.students.filter(function(s){ return cls.indexOf(s.cls)>=0; })
+      .forEach(function(s){ out.push({studentId:s.id, teacher:teacher||s.owner||'', tag:s.cls}); });
+  }else{
+    DB.students.filter(function(s){ return !teacher || s.owner===teacher || DB.courses.some(function(c){ return c.studentId===s.id&&c.teacher===teacher&&c.status==='在读'; }); })
+      .forEach(function(s){ out.push({studentId:s.id, teacher:teacher||'', tag:'送温暖'}); });
+  }
+  var seen={}; return out.filter(function(x){ if(seen[x.studentId]) return false; seen[x.studentId]=1; return true; });
+}
+function attOf(dateStr, session, sid, teacher){
+  return DB.attendance.filter(function(a){ return a.date===dateStr && a.session===session && a.studentId===sid && (!teacher||a.teacher===teacher); })[0];
+}
+function renderAttend(){
+  var date = document.getElementById('attDate').value || today();
+  var t = attendTeacher();
+  var r = roster(date, ATT_SESSION, t);
+  var src = ATT_SESSION==='正课' ? '应到来源：当天有课的学生'
+    : (ATT_SESSION==='晚自习' ? '应到来源：排班表中该天晚自习班级' : '应到来源：名下在读学生');
+  document.getElementById('attSrc').textContent = src + '（' + dayName(date) + '）· 应到 ' + r.length + ' 人';
+
+  var st = {};
+  r.forEach(function(x){ var a = attOf(date, ATT_SESSION, x.studentId, t); st[x.studentId] = a ? a.status : '出勤'; });
+  document.getElementById('attList').innerHTML = r.length ? r.map(function(x){
+    var s = stuById(x.studentId); if(!s) return '';
+    var v = st[x.studentId];
+    return '<div class="att s-'+v+'" onclick="cycleAtt(\''+date+'\',\''+ATT_SESSION+'\',\''+x.studentId+'\',\''+esc(t)+'\')">'+
+      '<span><span class="nm">'+esc(s.name)+'</span><br><span class="mini">'+esc(x.tag||'')+'</span></span>'+
+      '<span class="st st-'+v+'">'+v+'</span></div>';
+  }).join('') : '<div class="empty">今天这个场次没有应到学生（检查排班 / 课表星期字段）</div>';
+
+  var vals = Object.keys(st).map(function(k){ return st[k]; });
+  var present = vals.filter(function(v){ return v==='出勤'||v==='迟到'; }).length;
+  var late = vals.filter(function(v){ return v==='迟到'; }).length;
+  var leave = vals.filter(function(v){ return v==='请假'; }).length;
+  var absent= vals.filter(function(v){ return v==='缺勤'; }).length;
+  document.getElementById('rateV').textContent = pct(present, vals.length)+'%';
+  document.getElementById('rateDetail').innerHTML = '应到 <b>'+vals.length+'</b> 人 ｜ 实到 <b>'+present+'</b> 人（含迟到 '+late+'）｜ 请假 '+leave+' ｜ 缺勤 '+absent;
+
+  renderWeek(date, t);
+}
+function cycleAtt(date, session, sid, teacher){
+  var order = ['出勤','迟到','请假','缺勤'];
+  var a = attOf(date, session, sid, teacher);
+  var cur = a ? a.status : '出勤';
+  var nx = order[(order.indexOf(cur)+1)%4];
+  if(a){ a.status = nx; } else { DB.attendance.push({id:uid(), date:date, session:session, studentId:sid, teacher:teacher, status:nx}); }
+  save(); renderAttend();
+}
+function setAll(v){
+  var date = document.getElementById('attDate').value || today();
+  var t = attendTeacher();
+  roster(date, ATT_SESSION, t).forEach(function(x){
+    var a = attOf(date, ATT_SESSION, x.studentId, t);
+    if(a) a.status=v; else DB.attendance.push({id:uid(), date:date, session:ATT_SESSION, studentId:x.studentId, teacher:t, status:v});
+  });
+  save(); renderAttend();
+}
+function renderWeek(date, t){
+  var ws = weekStart(date);
+  var rows = {}, days = [];
+  for(var i=0;i<7;i++){ var d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+i);
+    days.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); }
+  ['正课','晚自习','送温暖'].forEach(function(sess){
+    days.forEach(function(dd){
+      var r = roster(dd, sess, t);
+      r.forEach(function(x){
+        var a = attOf(dd, sess, x.studentId, t); var stt = a?a.status:'出勤';
+        var k = sess; rows[k]=rows[k]||{n:0,p:0}; rows[k].n++; if(stt==='出勤'||stt==='迟到') rows[k].p++;
+      });
+    });
+  });
+  document.getElementById('weekTbl').innerHTML = '<thead><tr><th>场次</th><th class="num">应到人次数</th><th class="num">实到人次数</th><th class="num">出勤率</th></tr></thead><tbody>'+
+    (Object.keys(rows).length? Object.keys(rows).map(function(k){
+      return '<tr><td>'+k+'</td><td class="num">'+rows[k].n+'</td><td class="num">'+rows[k].p+'</td><td class="num"><b>'+pct(rows[k].p,rows[k].n)+'%</b></td></tr>'; }).join('')
+      : '<tr><td colspan="4" class="empty">本周暂无排班</td></tr>')+'</tbody>';
+}
+
+/* ================= 总控看板 ================= */
+function renderDash(){
+  var note = document.getElementById('dashNote');
+  if(!isBoss()){ note.innerHTML = '你当前是任课老师身��，下面看到的是<b>全校汇总</b>；如需按自己班级筛选，请让班主任开权限。'; }
+  else note.innerHTML = '总控视角：汇总<b>所有老师</b>的打卡结果。老师在自己设备上点完之后，数据会汇总到这里（同一台设备即时汇总；跨设备请用「导出/导入 JSON」同步）。';
+
+  var range = document.getElementById('dashRange').value, sess = document.getElementById('dashSession').value;
+  var t0 = today();
+  var from = range==='today'? t0 : range==='week'? weekStart(t0) : range==='month'? t0.slice(0,8)+'01' : '0000-00-00';
+  var recs = DB.attendance.filter(function(a){ return a.date>=from && (!sess||a.session===sess); });
+
+  var byT = {};
+  recs.forEach(function(a){ byT[a.teacher]=byT[a.teacher]||{n:0,p:0,late:0}; byT[a.teacher].n++;
+    if(a.status==='出勤'||a.status==='迟到') byT[a.teacher].p++; if(a.status==='迟到') byT[a.teacher].late++; });
+  var keys = Object.keys(byT).sort(function(a,b){ return pct(byT[b].p,byT[b].n)-pct(byT[a].p,byT[a].n); });
+  var tn=0, tp=0; keys.forEach(function(k){ tn+=byT[k].n; tp+=byT[k].p; });
+  document.getElementById('dashTbl').innerHTML = '<thead><tr><th>老师</th><th class="num">打卡人次</th><th class="num">实到</th><th class="num">迟到</th><th class="num">出勤率</th></tr></thead><tbody>'+
+    (keys.length? keys.map(function(k){
+      var v=byT[k], r=pct(v.p,v.n); var col = r>=90?'var(--green-700)': r>=75?'var(--amber)':'var(--warn)';
+      return '<tr><td>'+esc(k)+'</td><td class="num">'+v.n+'</td><td class="num">'+v.p+'</td><td class="num">'+v.late+'</td><td class="num"><b style="color:'+col+'">'+r+'%</b></td></tr>'; }).join('')
+      + '<tr style="background:var(--blue-50);font-weight:600"><td>合计</td><td class="num">'+tn+'</td><td class="num">'+tp+'</td><td class="num">-</td><td class="num">'+pct(tp,tn)+'%</td></tr>'
+      : '<tr><td colspan="5" class="empty">暂无打卡数据</td></tr>')+'</tbody>';
+
+  // 科目数按老师
+  var byC = {};
+  DB.courses.filter(function(c){ return c.status==='在读'; }).forEach(function(c){
+    byC[c.teacher]=byC[c.teacher]||{t:0,paid:0,act:0}; byC[c.teacher].t++;
+    if(c.ctype==='正价') byC[c.teacher].paid++; else byC[c.teacher].act++; });
+  var ck = Object.keys(byC);
+  document.getElementById('dashCourseTbl').innerHTML = '<thead><tr><th>老师</th><th class="num">总科目数</th><th class="num">正价</th><th class="num">活动</th></tr></thead><tbody>'+
+    (ck.length? ck.map(function(k){ var v=byC[k];
+      return '<tr><td>'+esc(k)+'</td><td class="num"><b>'+v.t+'</b></td><td class="num">'+v.paid+'</td><td class="num">'+v.act+'</td></tr>'; }).join('')
+      + '<tr style="background:var(--blue-50);font-weight:600"><td>全校合计</td><td class="num">'+ck.reduce(function(s,k){return s+byC[k].t;},0)+'</td>'+
+        '<td class="num">'+ck.reduce(function(s,k){return s+byC[k].paid;},0)+'</td><td class="num">'+ck.reduce(function(s,k){return s+byC[k].act;},0)+'</td></tr>'
+      : '<tr><td colspan="4" class="empty">暂无课程</td></tr>')+'</tbody>';
+
+  // 趋势
+  var days=[], vals=[];
+  for(var i=6;i>=0;i--){ var d=new Date(); d.setDate(d.getDate()-i);
+    var ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var rr = DB.attendance.filter(function(a){ return a.date===ds && (!sess||a.session===sess); });
+    var pp = rr.filter(function(a){ return a.status==='出勤'||a.status==='迟到'; }).length;
+    days.push(ds.slice(5)); vals.push(pct(pp, rr.length)); }
+  var maxV = Math.max(100, Math.max.apply(null, vals));
+  document.getElementById('trend').innerHTML = '<div style="display:flex;align-items:flex-end;gap:8px;height:150px">'+
+    vals.map(function(v,i){ return '<div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ink-2);margin-bottom:3px">'+(v||0)+'%</div>'+
+      '<div style="height:'+Math.max(4, v/maxV*110)+'px;background:linear-gradient(180deg,#2b8ae2,#1565c0);border-radius:5px 5px 0 0"></div>'+
+      '<div style="font-size:10px;color:var(--ink-3);margin-top:5px">'+days[i]+'</div></div>'; }).join('')+'</div>';
+}
+function exportAttendCSV(){
+  var rows = [['日期','场次','老师','学生','年级','班级','状态']];
+  DB.attendance.forEach(function(a){ var s=stuById(a.studentId);
+    rows.push([a.date,a.session,a.teacher,s?s.name:'',gradeKey(s?s.grade:''),s?s.cls:'',a.status]); });
+  downloadCSV(rows, '出勤明细_'+today()+'.csv');
+}
+function downloadCSV(rows, name){
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+}
+
+/* ================= 设置 ================= */
+function renderColors(){
+  var subs = {}; DB.courses.forEach(function(c){ subs[c.subject]=1; });
+  Object.keys(SUBJ_COLORS).forEach(function(s){ subs[s]=1; });
+  document.getElementById('colorBox').innerHTML = Object.keys(subs).map(function(s){
+    return '<div style="display:flex;align-items:center;gap:8px"><span class="chip" style="background:'+subColor(s)+';min-width:56px;text-align:center">'+esc(s)+'</span>'+
+      '<input type="color" value="'+subColor(s)+'" onchange="setColor(\''+s+'\',this.value)" style="width:44px;height:28px;border:1px solid var(--line);border-radius:6px"></div>';
+  }).join('');
+}
+function setColor(s,v){ DB.subjectColors=DB.subjectColors||{}; DB.subjectColors[s]=v; save(); renderColors(); renderHome(); }
+function renderAccounts(){
+  document.getElementById('accTbl').innerHTML = '<thead><tr><th>姓名</th><th>角色</th><th>密码</th><th>操作</th></tr></thead><tbody>'+
+    DB.accounts.map(function(a){
+      return '<tr><td>'+esc(a.name)+'</td><td>'+({teacher:'任课老师',head:'班主任',master:'校长'})[a.role]+'</td><td>'+esc(a.pwd||'')+'</td>'+
+        '<td><button class="btn gray sm" onclick="delAccount(\''+a.id+'\')">删除</button></td></tr>'; }).join('')+'</tbody>';
+}
+function addAccount(){
+  var n=document.getElementById('acName').value.trim(); if(!n){ alert('填姓名'); return; }
+  DB.accounts.push({id:uid(), name:n, role:document.getElementById('acRole').value, pwd:document.getElementById('acPwd').value||'123456'});
+  save(); renderAccounts(); fillSelects();
+}
+function delAccount(id){ DB.accounts=DB.accounts.filter(function(a){return a.id!==id;}); save(); renderAccounts(); fillSelects(); }
+
+function doImport(){
+  var txt = document.getElementById('impText').value.trim();
+  if(!txt){ alert('请先粘贴课表'); return; }
+  var sep = document.getElementById('impSep').value; sep = (sep==='\t')? '\t' : ',';
+  var lines = txt.split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if(/姓名|学生|科目/.test(lines[0])) lines.shift();
+  if(document.getElementById('impClear').checked){ DB.students=[]; DB.courses=[]; }
+  var addedC=0, addedS=0, warn=[];
+  var stuIndex={}; DB.students.forEach(function(s){ stuIndex[s.name+'|'+(s.cls||'')]=s; });
+  lines.forEach(function(line, i){
+    var p = line.split(sep).map(function(x){ return x.trim(); });
+    if(p.length<3){ warn.push('第'+(i+2)+'行列数不足，已跳过'); return; }
+    var name=p[0], grade=gradeKey(p[1]), cls=p[2]||'', subj=p[3]||'其他', ctype=(p[4]==='活动'?'活动':'正价'),
+        teacher=p[5]||'未指派', weekday=p[6]||'', slot=p[7]||'', room=p[8]||'';
+    var key = name+'|'+cls; var st = stuIndex[key];
+    if(!st){ st={id:uid(), name:name, grade:grade, cls:cls, school:'', owner:teacher}; DB.students.push(st); stuIndex[key]=st; addedS++; }
+    DB.courses.push({id:uid(), studentId:st.id, subject:subj, ctype:ctype, teacher:teacher, weekday:weekday, slot:slot, room:room, status:'在读'});
+    addedC++;
+  });
+  save(); fillSelects(); renderAll();
+  document.getElementById('impMsg').innerHTML = '导入完成：新增学生 '+addedS+' 人、课程 '+addedC+' 门。' + (warn.length? '<br>提示：'+warn.slice(0,5).join('；'):'') +
+    '<br>请到「首页」确认科目数，到「课表」确认星期/时段字段是否正确。';
+}
+function downloadTemplate(){
+  var rows=[['姓名','年级','班级','科目','类型','老师','星期','时段','教室'],
+    ['张三','七年级','七年级·1班','数学','正价','陶老师','周六','10:00-11:30','A101'],
+    ['张三','七���年级','七年级·1班','语文','正价','李老师','周日','14:00-15:30','A102'],
+    ['李四','九年级','九年级·3班','英语','活动','王老师','周六','08:00-09:30','B201']];
+  downloadCSV(rows,'课表导入模板.csv');
+}
+function exportJSON(){
+  var blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='工作台数据_'+today()+'.json'; a.click();
+}
+function importJSON(inp){
+  var f=inp.files[0]; if(!f) return; var r=new FileReader();
+  r.onload=function(){ try{ DB=JSON.parse(r.result); save(); alert('导入成功'); initUI(); }catch(e){ alert('文件格式不对'); } };
+  r.readAsText(f); inp.value='';
+}
+function loadSeed(){ if(!confirm('会用示例数据覆盖当前数据，确定？')) return; DB=seed(); save(); initUI(); }
+function clearAll(){ if(!confirm('确定清空全部数据？建议先导出备份。')) return;
+  if(!confirm('再确认一次：清空后不可恢复。')) return;
+  DB={students:[],courses:[],schedule:[],attendance:[],accounts:DB.accounts||[],subjectColors:{}}; save(); initUI(); }
+
+/* ================= 启动 ================= */
+load();
+</script>
+</body>
+</html>
