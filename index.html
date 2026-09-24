@@ -89,6 +89,40 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
 /* ---------- 学生墙 ---------- */
 .stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+/* --- 课表矩阵视图 --- */
+.tt-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin-bottom:16px;padding:14px 18px}
+.tt-title{font-size:16px;font-weight:700;color:var(--blue-900)}
+.tt-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.tt-legend .lg{display:inline-flex;align-items:center;gap:5px}
+.tt-legend .lg i{width:13px;height:13px;border-radius:4px;display:inline-block}
+.tt-legend .lg.dotted{color:var(--ink-3)}
+.tt-subj{margin-bottom:22px}
+.tt-subj-bar{display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,var(--sc,#2b8ae2),rgba(255,255,255,0));
+  border-radius:10px;padding:9px 14px;margin-bottom:12px;border-left:6px solid var(--sc,#2b8ae2)}
+.tt-subj-bar b{font-size:16px;color:#fff}
+.tt-subj-bar .n{background:rgba(255,255,255,.28);color:#fff;border-radius:20px;padding:2px 12px;font-size:12px}
+.tt-subj-bar .sp{flex:1}
+.tt-subj-bar .info{font-size:12px;color:rgba(255,255,255,.92)}
+.tt-tch{background:var(--blue-50);border:1px solid var(--line);border-radius:12px;padding:12px 14px 10px;margin-bottom:10px}
+.tt-tch-hd{display:flex;align-items:center;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+.tt-tch-hd .nm{font-weight:700;color:var(--blue-900);font-size:14.5px}
+.tt-tch-hd .room{font-size:11.5px;color:var(--ink-2);background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 10px}
+.tt-tch-hd .cnt{font-size:11.5px;color:#fff;background:var(--blue-500);border-radius:20px;padding:2px 10px}
+.tt-cls{border-top:1px dashed var(--line);padding:9px 0 8px;display:grid;grid-template-columns:130px 1fr;gap:8px}
+.tt-cls:first-of-type{border-top:none}
+.tt-cls-meta{padding-top:2px}
+.tt-cls-meta .c{font-weight:700;color:var(--ink);font-size:13.5px}
+.tt-cls-meta .m{font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.6}
+.tt-namelist{display:flex;flex-wrap:wrap;gap:5px}
+.tt-name{font-size:12.5px;padding:3px 9px;border-radius:6px;cursor:pointer;transition:.15s;
+  border:1px solid rgba(0,0,0,.06);white-space:nowrap;color:#24303d}
+.tt-name:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(15,58,110,.16)}
+.tt-name.k1{background:#fdf1d0}
+.tt-name.k2{background:#efe3fb}
+.tt-name.k3{background:#d8f3e5}
+.tt-name.k4{background:#e8ecf2}
+.tt-name.dim{opacity:.16;filter:grayscale(.4)}
+.tt-name.hl{outline:2.5px solid var(--blue-700);outline-offset:1px;font-weight:700;z-index:2;position:relative}
 .stu{background:#fff;border:1px solid var(--line);border-left:4px solid var(--blue-500);border-radius:10px;padding:10px 12px;cursor:pointer;transition:.18s}
 .stu:hover{box-shadow:0 4px 14px rgba(21,101,192,.16);transform:translateY(-1px)}
 .stu .nm{font-weight:600;font-size:14px}
@@ -162,7 +196,8 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
   </div>
   <nav class="tabs" id="tabs">
     <button data-p="home" class="on">首页 · 科目数</button>
-    <button data-p="courses">课表 / 学生</button>
+    <button data-p="tt">课表</button>
+    <button data-p="courses">操作学生</button>
     <button data-p="attend">出勤打卡</button>
     <button data-p="dash">总控看板</button>
     <button data-p="set">设置</button>
@@ -217,7 +252,29 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
       </div>
     </div>
 
-    <!-- ---------- 课表 ---------- -->
+    <!-- ---------- 课表（矩阵视图） ---------- -->
+    <div class="page" id="p-tt">
+      <div class="tt-head card">
+        <div class="tt-title">总课表 <span class="tag" id="ttScope"></span></div>
+        <div class="tt-legend">
+          <span class="lg"><i style="background:#f2c14e"></i>单科</span>
+          <span class="lg"><i style="background:#a97ce8"></i>两科</span>
+          <span class="lg"><i style="background:#3fbf87"></i>三科</span>
+          <span class="lg"><i style="background:#8a94a6"></i>四科及以上</span>
+          <span class="lg dotted">点学生 = 查他在其他老师那里的课</span>
+        </div>
+        <div class="toolbar">
+          <input id="qTT" placeholder="搜学生姓名" oninput="renderTT()" style="min-width:200px">
+          <select id="ttSub" onchange="renderTT()"><option value="">全部科目</option></select>
+          <select id="ttGrade" onchange="renderTT()"><option value="">全部年级</option><option>七年级</option><option>八年级</option><option>九年级</option></select>
+          <button class="btn gray sm" onclick="clearHL();renderTT()">取消高亮</button>
+          <span class="mini" id="ttCount"></span>
+        </div>
+      </div>
+      <div id="ttBody"></div>
+    </div>
+
+    <!-- ---------- 操作学生 ---------- -->
     <div class="page" id="p-courses">
       <div class="card">
         <h3>课程明细 <span class="tag">改状态 → 首页科目数即时加减</span></h3>
@@ -557,12 +614,13 @@ function showPage(p){
   document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.p===p); });
   document.querySelectorAll('.page').forEach(function(d){ d.classList.toggle('on', d.id==='p-'+p); });
   if(p==='home') renderHome();
+  if(p==='tt') renderTT();
   if(p==='courses'){ renderCourses(); renderSchedule(); }
   if(p==='attend') renderAttend();
   if(p==='dash') renderDash();
   if(p==='set'){ renderColors(); renderAccounts(); }
 }
-function renderAll(){ renderHome(); renderCourses(); renderSchedule(); renderAttend(); renderDash(); }
+function renderAll(){ renderHome(); renderTT(); renderCourses(); renderSchedule(); renderAttend(); renderDash(); }
 
 /* ================= 首页统计 ================= */
 function renderHome(){
@@ -676,7 +734,87 @@ function setHL(id){
     }).join('') : '<div class="mini">该生暂无在读课程</div>';
   p.style.display='block';
 }
-function clearHL(){ HL=null; renderStudents(); document.getElementById('hlPanel').style.display='none'; }
+function clearHL(){ HL=null; renderStudents(); renderTT(); document.getElementById('hlPanel').style.display='none'; }
+
+/* ---------- 课表矩阵视图（Excel 式排布） ---------- */
+function stuSubjectCount(){
+  var m = {};
+  DB.courses.forEach(function(c){ if(c.status!=='在读') return;
+    (m[c.studentId]=m[c.studentId]||{})[c.subject]=1; });
+  var out = {}; Object.keys(m).forEach(function(id){ out[id]=Object.keys(m[id]).length; });
+  return out;
+}
+function renderTT(){
+  var box = document.getElementById('ttBody'); if(!box) return;
+  var q  = (document.getElementById('qTT').value||'').trim();
+  var fs = document.getElementById('ttSub').value;
+  var fg = document.getElementById('ttGrade').value;
+  var cs = activeCourses();
+  var kmap = stuSubjectCount();
+
+  document.getElementById('ttScope').textContent = isBoss() ? '全校口径' : '只看「'+ME.name+'」名下';
+
+  /* 按 科目 → 老师 → 班级 分组，保持表内原有顺序 */
+  var S = []; var sIdx = {};
+  cs.forEach(function(c){
+    var s = stuById(c.studentId); if(!s) return;
+    if(fs && c.subject!==fs) return;
+    if(fg && gradeKey(s.grade)!==fg) return;
+    if(q && s.name.indexOf(q)<0 && (s.cls||'').indexOf(q)<0) return;
+    if(!sIdx[c.subject]){ sIdx[c.subject] = {name:c.subject, t:[], tIdx:{}, n:0, clsN:0, stu:{}}; S.push(sIdx[c.subject]); }
+    var A = sIdx[c.subject]; A.n++; A.clsN++; A.stu[s.id]=1;
+    var key = c.teacher;
+    if(!A.tIdx[key]){ A.tIdx[key] = {name:c.teacher, room:c.room||'', cls:[], cIdx:{}, n:0}; A.t.push(A.tIdx[key]); }
+    var T = A.tIdx[key]; T.n++;
+    var ck = c.cls || c.teacher;
+    if(!T.cIdx[ck]){ T.cIdx[ck] = {name:ck, letter:clsLetter(ck, c.teacher), grade:gradeKey(s.grade), ctype:c.ctype, level:c.level||'', ids:[], seen:{}, n:0}; T.cls.push(T.cIdx[ck]); }
+    var C = T.cIdx[ck];
+    if(!C.seen[s.id]){ C.seen[s.id]=1; C.ids.push(s.id); C.n++; }
+    if(C.grade==='未分年级') C.grade = gradeKey(s.grade);
+  });
+
+  var totalStu = {}, totalCls = 0, totalN = 0;
+  S.forEach(function(A){ totalCls += A.t.reduce(function(a,t){ return a+t.cls.length; },0); totalN += A.n;
+    Object.keys(A.stu).forEach(function(id){ totalStu[id]=1; }); });
+  document.getElementById('ttCount').innerHTML = '共 <b>'+S.length+'</b> 个科目 · <b>'+ totalCls +'</b> 个班 · <b>'+totalN+'</b> 人次 · <b>'+Object.keys(totalStu).length+'</b> 人';
+
+  if(!S.length){ box.innerHTML = '<div class="card"><div class="empty">没有匹配的课表数据</div></div>'; return; }
+
+  var html = S.map(function(A){
+    var col = subColor(A.name);
+    var stun = Object.keys(A.stu).length;
+    var out = '<div class="tt-subj" style="--sc:'+col+'">'+
+      '<div class="tt-subj-bar" style="background:linear-gradient(90deg,'+col+','+col+'cc)">'+
+        '<b>'+esc(A.name)+'</b><span class="n">'+A.n+' 科</span>'+
+        '<span class="sp"></span><span class="info">'+stun+' 人 · '+A.t.length+' 位老师</span>'+
+      '</div>';
+    out += A.t.map(function(T){
+      var clsn = T.cls.reduce(function(a,c){ return a+c.n; },0);
+      return '<div class="tt-tch">'+
+        '<div class="tt-tch-hd"><span class="nm">'+esc(T.name)+'</span>'+
+          (T.room? '<span class="room">教室 '+esc(T.room)+'</span>':'')+
+          '<span class="cnt">'+T.n+' 科 / '+clsn+' 人</span></div>'+
+        T.cls.map(function(C){
+          var names = C.ids.map(function(id){
+            var s = stuById(id); if(!s) return '';
+            var k = kmap[id]||1; var kc = k>=4?'k4':('k'+k);
+            return '<span class="tt-name '+kc+(HL===id?' hl':'')+(HL&&HL!==id?' dim':'')+'" onclick="setHLTT(\''+id+'\')" title="'+esc(T.name)+' · '+esc(A.name)+'　共'+k+'科">'+esc(s.name)+'</span>';
+          }).join('');
+          return '<div class="tt-cls"><div class="tt-cls-meta"><div class="c">'+esc(C.letter)+'</div>'+
+            '<div class="m">'+esc(C.grade)+'<br>'+esc(C.ctype)+(C.level?' · '+esc(C.level):'')+'<br><b style="color:var(--blue-700);font-size:13px">'+C.n+'</b> 人</div></div>'+
+            '<div class="tt-namelist">'+names+'</div></div>';
+        }).join('') + '</div>';
+    }).join('') + '</div>';
+    return out;
+  }).join('');
+  box.innerHTML = html;
+}
+function clsLetter(cls, teacher){
+  if(!cls) return '—';
+  if(teacher && cls.indexOf(teacher)===0){ var r = cls.slice(teacher.length); return r || '本班'; }
+  return cls;
+}
+function setHLTT(id){ setHL(id); renderTT(); }
 
 /* ================= 课表页 ================= */
 function renderCourses(){
@@ -749,6 +887,11 @@ function fillSelects(){
   var subs = {}; DB.courses.forEach(function(c){ subs[c.subject]=1; });
   fs.innerHTML = '<option value="">全部科目</option>' + Object.keys(subs).map(function(s){ return '<option>'+s+'</option>'; }).join('');
   fs.value = keep;
+
+  var ts2 = document.getElementById('ttSub');
+  if(ts2){ var keep2 = ts2.value;
+    ts2.innerHTML = '<option value="">全部科目</option>' + Object.keys(subs).map(function(s){ return '<option>'+s+'</option>'; }).join('');
+    ts2.value = keep2; }
   if(!document.getElementById('attDate').value) document.getElementById('attDate').value = today();
 }
 function attendTeacher(){ return isBoss() ? (document.getElementById('attTeacher').value||'') : ME.name; }
