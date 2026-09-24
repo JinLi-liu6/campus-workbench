@@ -196,9 +196,9 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
       </div>
 
       <div class="card">
-        <h3>退课 / 退费 <span class="tag">已从上方科目数中扣除</span></h3>
+        <h3>停课 / 退费 <span class="tag">已从上方科目数中扣除</span></h3>
         <div class="grid g2" style="margin-bottom:10px">
-          <div class="bar-row"><span class="lb">退课</span><span class="bar"><i style="width:0%;background:#7f8c9b"></i></span><span class="vv" id="s_drop">0</span></div>
+          <div class="bar-row"><span class="lb">停课</span><span class="bar"><i style="width:0%;background:#7f8c9b"></i></span><span class="vv" id="s_drop">0</span></div>
           <div class="bar-row"><span class="lb">退费</span><span class="bar"><i style="width:0%;background:var(--warn)"></i></span><span class="vv" id="s_refund">0</span></div>
         </div>
         <div class="tbl-scroll" style="max-height:220px"><table id="dropTbl"></table></div>
@@ -417,7 +417,7 @@ function seed(){
     }
   }
   // 制造 2 个退课、1 个退费
-  if(courses[3]) courses[3].status='退课';
+  if(courses[3]) courses[3].status='停课';
   if(courses[7]) courses[7].status='退课';
   if(courses[11]) courses[11].status='退费';
   var sched = [];
@@ -568,7 +568,9 @@ function renderAll(){ renderHome(); renderCourses(); renderSchedule(); renderAtt
 function renderHome(){
   var cs = activeCourses();
   var scope = isBoss() ? '当前口径：全校（总控权限）' : '当前口径：只统计「'+ME.name+'」名下的课';
-  document.getElementById('scopeNote').innerHTML = scope + '　｜　数据日期：' + today() + '　｜　课表发来后可在「设置 → 导入课表」一键替换。';
+  var nStop = DB.courses.filter(function(c){ return c.status==='停课'; }).length;
+  var nRef  = DB.courses.filter(function(c){ return c.status==='退费'; }).length;
+  document.getElementById('scopeNote').innerHTML = scope + '　｜　科目数只算「在读」，另计：<b>停课 '+nStop+' 门</b>、<b style="color:#c0392b">退费 '+nRef+' 门</b>（都不计入科目数）　｜　' + today();
 
   var paid = cs.filter(function(c){ return c.ctype==='正价'; }).length;
   var act  = cs.filter(function(c){ return c.ctype==='活动'; }).length;
@@ -619,7 +621,7 @@ function renderHome(){
 
   // 退课退费
   var drops = DB.courses.filter(function(c){ return c.status!=='在读' && (isBoss()||c.teacher===ME.name); });
-  var nDrop = drops.filter(function(c){ return c.status==='退课'; }).length;
+  var nDrop = drops.filter(function(c){ return c.status==='停课'; }).length;
   var nRef  = drops.filter(function(c){ return c.status==='退费'; }).length;
   document.getElementById('s_drop').textContent = nDrop + ' 门';
   document.getElementById('s_refund').textContent = nRef + ' 门';
@@ -651,9 +653,13 @@ function renderStudents(){
   document.getElementById('stuCount').textContent = list.length;
   document.getElementById('stuGrid').innerHTML = list.map(function(s){
     var cs2 = map[s.id]||[];
+    var nSub = {}; cs2.forEach(function(c){ nSub[c.subject]=1; });
+    var k = Object.keys(nSub).length;
+    var kc = {1:'#f2a63b',2:'#7b5cd6',3:'#17915f'}[k] || '#8a94a6';
     var chips = cs2.map(function(c){ return '<span class="chip" style="background:'+subColor(c.subject)+'">'+esc(c.subject)+'·'+esc(c.teacher)+'</span>'; }).join('');
     return '<div class="stu'+(HL===s.id?' hl':'')+(HL&&HL!==s.id?' dim':'')+'" onclick="setHL(\''+s.id+'\')">'+
-      '<div class="nm">'+esc(s.name)+' <span class="mini">'+gradeKey(s.grade)+'</span></div>'+
+      '<div class="nm">'+esc(s.name)+' <span class="mini">'+gradeKey(s.grade)+'</span>'+
+      '<span class="chip" style="background:'+kc+';float:right;margin:0">'+k+'科</span></div>'+
       '<div class="mt">'+esc(s.cls||'')+' · '+cs2.length+' 门</div><div class="subs">'+chips+'</div></div>';
   }).join('') || '<div class="empty">没有匹配的学生</div>';
 }
@@ -682,17 +688,17 @@ function renderCourses(){
   if(q){ list=list.filter(function(c){ var s=stuById(c.studentId);
     return (s&&s.name.indexOf(q)>=0)||c.teacher.indexOf(q)>=0||c.subject.indexOf(q)>=0; }); }
   document.getElementById('courseTbl').innerHTML =
-    '<thead><tr><th>学生</th><th>年级/班级</th><th>科目</th><th>类型</th><th>老师</th><th>时间</th><th>教室</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
+    '<thead><tr><th>学生</th><th>年级</th><th>班级</th><th>科目</th><th>类型</th><th>老师</th><th>层次</th><th>教室</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
     (list.length? list.map(function(c){ var s=stuById(c.studentId);
-      return '<tr><td>'+esc(s?s.name:'-')+'</td><td>'+gradeKey(s?s.grade:'')+' '+esc(s?s.cls:'')+'</td>'+
+      return '<tr><td>'+esc(s?s.name:'-')+'</td><td>'+gradeKey(s?s.grade:'')+'</td><td>'+esc(c.cls||(s?s.cls:''))+'</td>'+
         '<td><span class="chip" style="background:'+subColor(c.subject)+'">'+esc(c.subject)+'</span></td><td>'+c.ctype+'</td><td>'+esc(c.teacher)+'</td>'+
-        '<td>'+esc(c.weekday||'')+' '+esc(c.slot||'')+'</td><td>'+esc(c.room||'')+'</td>'+
+        '<td>'+esc(c.level||'')+'</td><td>'+esc(c.room||'')+'</td>'+
         '<td>'+(c.status==='在读'?'<span style="color:var(--green-700)">在读</span>':'<span style="color:var(--warn)">'+c.status+'</span>')+'</td>'+
         '<td><div class="row-actions">'+
-          (c.status==='在读'? '<button class="btn gray sm" onclick="setStatus(\''+c.id+'\',\'退课\')">退课</button><button class="btn danger sm" onclick="setStatus(\''+c.id+'\',\'退费\')">退费</button>'
+          (c.status==='在读'? '<button class="btn gray sm" onclick="setStatus(\''+c.id+'\',\'停课\')">停课</button><button class="btn danger sm" onclick="setStatus(\''+c.id+'\',\'退费\')">退费</button>'
             : '<button class="btn g sm" onclick="setStatus(\''+c.id+'\',\'在读\')">恢复</button>')+
           '<button class="btn gray sm" onclick="delCourse(\''+c.id+'\')">删除</button></div></td></tr>'; }).join('')
-      : '<tr><td colspan="9" class="empty">暂无课程</td></tr>')+'</tbody>';
+      : '<tr><td colspan="10" class="empty">暂无课程</td></tr>')+'</tbody>';
 }
 function setStatus(id, st){ var c=DB.courses.filter(function(x){return x.id===id;})[0]; if(c){ c.status=st; save(); renderAll(); } }
 function restoreCourse(id){ setStatus(id,'在读'); }
@@ -749,7 +755,8 @@ function attendTeacher(){ return isBoss() ? (document.getElementById('attTeacher
 function roster(dateStr, session, teacher){
   var day = dayName(dateStr), out = [];
   if(session==='正课'){
-    DB.courses.filter(function(c){ return c.status==='在读' && c.weekday===day && (!teacher||c.teacher===teacher); })
+    // 课表里没写星期时，列出该老师名下全部在读学生（按班分组）；写了星期就按当天筛
+    DB.courses.filter(function(c){ return c.status==='在读' && (!c.weekday || c.weekday===day) && (!teacher||c.teacher===teacher); })
       .forEach(function(c){ out.push({studentId:c.studentId, teacher:c.teacher, tag:c.subject+' '+c.slot}); });
   }else if(session==='晚自习'){
     var cls = DB.schedule.filter(function(s){ return s.stype==='晚自习' && s.weekday===day && (!teacher||s.teacher===teacher); })
