@@ -108,13 +108,13 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .tt-tch-hd .nm{font-weight:700;color:var(--blue-900);font-size:14.5px}
 .tt-tch-hd .room{font-size:11.5px;color:var(--ink-2);background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 10px}
 .tt-tch-hd .cnt{font-size:11.5px;color:#fff;background:var(--blue-500);border-radius:20px;padding:2px 10px}
-.tt-cls{border-top:1px dashed var(--line);padding:9px 0 8px;display:grid;grid-template-columns:130px 1fr;gap:8px}
+.tt-cls{border-top:1px dashed var(--line);padding:7px 0 6px;display:grid;grid-template-columns:104px 1fr;gap:8px}
 .tt-cls:first-of-type{border-top:none}
-.tt-cls-meta{padding-top:2px}
-.tt-cls-meta .c{font-weight:700;color:var(--ink);font-size:13.5px}
-.tt-cls-meta .m{font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.6}
-.tt-namelist{display:flex;flex-wrap:wrap;gap:5px}
-.tt-name{font-size:12.5px;padding:3px 9px;border-radius:6px;cursor:pointer;transition:.15s;
+.tt-cls-meta{padding-top:1px}
+.tt-cls-meta .c{font-weight:700;color:var(--ink);font-size:12.5px}
+.tt-cls-meta .m{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.55}
+.tt-namelist{display:flex;flex-wrap:wrap;gap:4px}
+.tt-name{font-size:11px;padding:2px 7px;border-radius:5px;cursor:pointer;transition:.15s;
   border:1px solid rgba(0,0,0,.06);white-space:nowrap;color:#24303d}
 .tt-name:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(15,58,110,.16)}
 .tt-name.k1{background:#fdf1d0}
@@ -123,6 +123,13 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .tt-name.k4{background:#e8ecf2}
 .tt-name.dim{opacity:.16;filter:grayscale(.4)}
 .tt-name.hl{outline:2.5px solid var(--blue-700);outline-offset:1px;font-weight:700;z-index:2;position:relative}
+/* 出勤矩阵姓名块：按状态着色 */
+.tt-name.a-出勤{background:#d3f0e2;border-color:#9edcbc}
+.tt-name.a-迟到{background:#fdeecb;border-color:#eed193}
+.tt-name.a-请假{background:#e8ecf2;border-color:#c8d1dc;color:#6b7684}
+.tt-name.a-缺勤{background:#fbd9db;border-color:#f0aeb3;color:#8f2f36}
+.att-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.att-legend i{width:12px;height:12px;border-radius:4px;display:inline-block;margin-right:4px;vertical-align:-1px}
 .stu{background:#fff;border:1px solid var(--line);border-left:4px solid var(--blue-500);border-radius:10px;padding:10px 12px;cursor:pointer;transition:.18s}
 .stu:hover{box-shadow:0 4px 14px rgba(21,101,192,.16);transform:translateY(-1px)}
 .stu .nm{font-weight:600;font-size:14px}
@@ -316,11 +323,18 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
           <button class="btn gray sm" onclick="setAll('出勤')">全部出勤</button>
           <span class="mini" id="attSrc"></span>
         </div>
-        <div class="rate-box" style="margin-bottom:14px">
+        <div class="rate-box" style="margin-bottom:12px">
           <div class="rate"><span id="rateV">0%</span> <small>出勤率</small></div>
           <div class="mini" id="rateDetail"></div>
         </div>
-        <div class="att-list" id="attList"></div>
+        <div class="att-legend" style="margin-bottom:10px">
+          <span><i style="background:#d3f0e2"></i>出勤（默认）</span>
+          <span><i style="background:#fdeecb"></i>点一下 = 迟到</span>
+          <span><i style="background:#e8ecf2"></i>点两下 = 请假</span>
+          <span><i style="background:#fbd9db"></i>点三下 = 缺勤</span>
+          <span><i style="background:#fff;border:1px dashed var(--line)"></i>再点回出勤</span>
+        </div>
+        <div id="attList"></div>
       </div>
 
       <div class="card">
@@ -573,6 +587,7 @@ function doLogin(){
     acc = {id:uid(), name:name, role:role, pwd:pwd}; DB.accounts.push(acc); save(); }
   else if(acc.pwd && acc.pwd !== pwd){ alert('密码不对'); return; }
   ME = acc;
+  document.getElementById('attTeacher').value = '';   // 换账号登录时清掉上一个账号的老师筛选，防止总控只看到上一位老师的课
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('who').textContent = acc.name + ' · ' + ({teacher:'任课老师',head:'班主任',master:'校长'})[acc.role];
@@ -918,28 +933,95 @@ function attOf(dateStr, session, sid, teacher){
 function renderAttend(){
   var date = document.getElementById('attDate').value || today();
   var t = attendTeacher();
-  var r = roster(date, ATT_SESSION, t);
+  var day = dayName(date);
   var src = ATT_SESSION==='正课' ? '应到来源：当天有课的学生'
     : (ATT_SESSION==='晚自习' ? '应到来源：排班表中该天晚自习班级' : '应到来源：名下在读学生');
-  document.getElementById('attSrc').textContent = src + '（' + dayName(date) + '）· 应到 ' + r.length + ' 人';
 
+  /* ---- 按课表层级分组：科目 → 老师 → 班级（与「课表」页同一套样式） ---- */
+  var S=[], sIdx={};
+  function pushGroup(subj, teacher, room, ck, letter, meta, sid){
+    if(!sIdx[subj]){ sIdx[subj]={name:subj, t:[], tIdx:{}, n:0}; S.push(sIdx[subj]); }
+    var A = sIdx[subj];
+    if(!A.tIdx[teacher]){ A.tIdx[teacher]={name:teacher, room:room||'', cls:[], cIdx:{}, n:0}; A.t.push(A.tIdx[teacher]); }
+    var T = A.tIdx[teacher];
+    if(!T.cIdx[ck]){ T.cIdx[ck]={name:ck, letter:letter, meta:meta, ids:[], seen:{}}; T.cls.push(T.cIdx[ck]); }
+    var C = T.cIdx[ck];
+    if(!C.seen[sid]){ C.seen[sid]=1; C.ids.push(sid); }
+    T.n++; A.n++;
+  }
+  if(ATT_SESSION==='正课'){
+    DB.courses.forEach(function(c){
+      if(c.status!=='在读') return;
+      if(c.weekday && c.weekday!==day) return;
+      if(t && c.teacher!==t) return;
+      var s = stuById(c.studentId); if(!s) return;
+      var ck = c.cls || c.teacher;
+      pushGroup(c.subject, c.teacher, c.room, ck, clsLetter(ck, c.teacher),
+        gradeKey(s.grade)+' · '+c.ctype+(c.level?' · '+c.level:''), s.id);
+    });
+  } else if(ATT_SESSION==='晚自习'){
+    DB.schedule.filter(function(x){ return x.stype==='晚自习' && x.weekday===day && (!t || x.teacher===t); })
+      .forEach(function(x){
+        DB.students.filter(function(s){ return s.cls===x.cls; }).forEach(function(s){
+          pushGroup('晚自习', x.teacher || t || '未排值班', '', x.cls, x.cls, gradeKey(s.grade)+(x.slot?' · '+x.slot:''), s.id);
+        });
+      });
+  } else {
+    DB.students.filter(function(s){ return !t || s.owner===t || DB.courses.some(function(c){ return c.studentId===s.id && c.teacher===t && c.status==='在读'; }); })
+      .forEach(function(s){
+        pushGroup('送温暖', s.owner || t || '未分配', '', '送温暖', '送温暖', gradeKey(s.grade), s.id);
+      });
+  }
+
+  /* ---- 状态与统计 ---- */
+  var seen={}, flat=[];
+  S.forEach(function(A){ A.t.forEach(function(T){ T.cls.forEach(function(C){ C.ids.forEach(function(id){ if(!seen[id]){ seen[id]=1; flat.push(id); } }); }); }); });
   var st = {};
-  r.forEach(function(x){ var a = attOf(date, ATT_SESSION, x.studentId, t); st[x.studentId] = a ? a.status : '出勤'; });
-  document.getElementById('attList').innerHTML = r.length ? r.map(function(x){
-    var s = stuById(x.studentId); if(!s) return '';
-    var v = st[x.studentId];
-    return '<div class="att s-'+v+'" onclick="cycleAtt(\''+date+'\',\''+ATT_SESSION+'\',\''+x.studentId+'\',\''+esc(t)+'\')">'+
-      '<span><span class="nm">'+esc(s.name)+'</span><br><span class="mini">'+esc(x.tag||'')+'</span></span>'+
-      '<span class="st st-'+v+'">'+v+'</span></div>';
-  }).join('') : '<div class="empty">今天这个场次没有应到学生（检查排班 / 课表星期字段）</div>';
+  flat.forEach(function(id){ var a = attOf(date, ATT_SESSION, id, t); st[id] = a ? a.status : '出勤'; });
 
-  var vals = Object.keys(st).map(function(k){ return st[k]; });
+  document.getElementById('attSrc').textContent = src + '（' + day + '）· 应到 ' + flat.length + ' 人';
+
+  var vals = flat.map(function(id){ return st[id]; });
   var present = vals.filter(function(v){ return v==='出勤'||v==='迟到'; }).length;
   var late = vals.filter(function(v){ return v==='迟到'; }).length;
   var leave = vals.filter(function(v){ return v==='请假'; }).length;
   var absent= vals.filter(function(v){ return v==='缺勤'; }).length;
   document.getElementById('rateV').textContent = pct(present, vals.length)+'%';
   document.getElementById('rateDetail').innerHTML = '应到 <b>'+vals.length+'</b> 人 ｜ 实到 <b>'+present+'</b> 人（含迟到 '+late+'）｜ 请假 '+leave+' ｜ 缺勤 '+absent;
+
+  /* ---- 矩阵渲染（与课表页一致） ---- */
+  var html = S.length ? S.map(function(A){
+    var col = subColor(A.name);
+    var stun = {}; A.t.forEach(function(T){ T.cls.forEach(function(C){ C.ids.forEach(function(id){ stun[id]=1; }); }); });
+    var out = '<div class="tt-subj" style="--sc:'+col+'">'+
+      '<div class="tt-subj-bar" style="background:linear-gradient(90deg,'+col+','+col+'cc)">'+
+        '<b>'+esc(A.name)+'</b><span class="n">'+A.n+' 人次</span>'+
+        '<span class="sp"></span><span class="info">'+Object.keys(stun).length+' 人 · '+A.t.length+' 位老师</span>'+
+      '</div>';
+    out += A.t.map(function(T){
+      var n = T.cls.reduce(function(a,c){ return a+c.ids.length; },0);
+      return '<div class="tt-tch">'+
+        '<div class="tt-tch-hd"><span class="nm">'+esc(T.name)+'</span>'+
+          (T.room? '<span class="room">教室 '+esc(T.room)+'</span>':'')+
+          '<span class="cnt">'+n+' 人</span></div>'+
+        T.cls.map(function(C){
+          var names = C.ids.map(function(id){
+            var s = stuById(id); if(!s) return '';
+            var v = st[id];
+            return '<span class="tt-name a-'+v+'" onclick="cycleAtt(\''+date+'\',\''+ATT_SESSION+'\',\''+id+'\',\''+esc(t)+'\')" title="'+esc(C.letter)+' · '+esc(C.meta||'')+'　当前：'+v+'（点击切换）">'+esc(s.name)+'</span>';
+          }).join('');
+          var cst = C.ids.map(function(id){ return st[id]; });
+          var cAb = cst.filter(function(v){ return v==='缺勤'; }).length;
+          var cLv = cst.filter(function(v){ return v==='请假'; }).length;
+          return '<div class="tt-cls"><div class="tt-cls-meta"><div class="c">'+esc(C.letter)+'</div>'+
+            '<div class="m">'+esc(C.meta||'')+'<br><b style="color:var(--blue-700);font-size:12px">'+C.ids.length+'</b> 人'+
+            (cAb? ' · <span style="color:#c0392b">缺'+cAb+'</span>':'')+(cLv? ' · <span style="color:#6b7684">假'+cLv+'</span>':'')+'</div></div>'+
+            '<div class="tt-namelist">'+names+'</div></div>';
+        }).join('') + '</div>';
+    }).join('') + '</div>';
+    return out;
+  }).join('') : '<div class="card"><div class="empty">今天这个场次没有应到学生（检查排班 / 课表星期字段）</div></div>';
+  document.getElementById('attList').innerHTML = html;
 
   renderWeek(date, t);
 }
