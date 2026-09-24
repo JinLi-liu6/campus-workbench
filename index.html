@@ -313,7 +313,7 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
       <div class="card">
         <h3>今日出勤打卡 <span class="tag">默认全员出勤，点一下改状态</span></h3>
         <div class="toolbar">
-          <input type="date" id="attDate" onchange="renderAttend()">
+          <input id="attDate" placeholder="日期：9-24 / 2026-09-24 / 今天" onchange="renderAttend()" onblur="renderAttend()" style="width:205px">
           <div class="seg" id="attSeg">
             <button data-s="正课" class="on">正课出勤</button>
             <button data-s="晚自习">晚自习出勤</button>
@@ -449,6 +449,24 @@ var DB = null, ME = null, ATT_SESSION = '正课', HL = null;
 
 function uid(){ return 'x'+Math.random().toString(36).slice(2,9); }
 function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* 手填日期：支持 9-24 / 9/24 / 9月24日 / 2026-09-24 / 今天·昨天·明天·后天 */
+function pad2(n){ return String(n).padStart(2,'0'); }
+function shiftDate(d, n){ var x=new Date(d+'T00:00:00'); x.setDate(x.getDate()+n);
+  return x.getFullYear()+'-'+pad2(x.getMonth()+1)+'-'+pad2(x.getDate()); }
+function parseDate(s){
+  s = String(s==null?'':s).trim();
+  if(!s) return today();
+  if(s.indexOf('今天')>=0) return today();
+  if(s.indexOf('昨天')>=0) return shiftDate(today(), -1);
+  if(s.indexOf('明天')>=0) return shiftDate(today(), 1);
+  if(s.indexOf('后天')>=0) return shiftDate(today(), 2);
+  var m = s.match(/(\d{4})\s*[-\/.年]\s*(\d{1,2})\s*[-\/.月]\s*(\d{1,2})/);
+  if(m) return m[1]+'-'+pad2(m[2])+'-'+pad2(m[3]);
+  var m2 = s.match(/(\d{1,2})\s*[-\/.月]\s*(\d{1,2})/);
+  if(m2) return String(new Date().getFullYear())+'-'+pad2(m2[1])+'-'+pad2(m2[2]);
+  return today();
+}
+function attDateVal(){ var el=document.getElementById('attDate'); return parseDate(el ? el.value : ''); }
 function dayName(dateStr){ var d=new Date(dateStr+'T00:00:00'); return DAYS[(d.getDay()+6)%7]; }
 function weekStart(dateStr){ var d=new Date(dateStr+'T00:00:00'); var w=(d.getDay()+6)%7; d.setDate(d.getDate()-w);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -930,15 +948,9 @@ function roster(dateStr, session, teacher){
 function attOf(dateStr, session, sid, teacher){
   return DB.attendance.filter(function(a){ return a.date===dateStr && a.session===session && a.studentId===sid && (!teacher||a.teacher===teacher); })[0];
 }
-function renderAttend(){
-  var date = document.getElementById('attDate').value || today();
-  var t = attendTeacher();
-  var day = dayName(date);
-  var src = ATT_SESSION==='正课' ? '应到来源：当天有课的学生'
-    : (ATT_SESSION==='晚自习' ? '应到来源：排班表中该天晚自习班级' : '应到来源：名下在读学生');
-
-  /* ---- 按课表层级分组：科目 → 老师 → 班级（与「课表」页同一套样式） ---- */
-  var S=[], sIdx={};
+/* 应到名单分组树：科目 → 老师 → 班级（正课 / 晚自习都按课表全体班级；送温暖按名下学生） */
+function buildAttTree(date, session, t){
+  var day = dayName(date), S=[], sIdx={};
   function pushGroup(subj, teacher, room, ck, letter, meta, sid){
     if(!sIdx[subj]){ sIdx[subj]={name:subj, t:[], tIdx:{}, n:0}; S.push(sIdx[subj]); }
     var A = sIdx[subj];
@@ -949,7 +961,7 @@ function renderAttend(){
     if(!C.seen[sid]){ C.seen[sid]=1; C.ids.push(sid); }
     T.n++; A.n++;
   }
-  if(ATT_SESSION==='正课'){
+  if(session==='正课' || session==='晚自习'){
     DB.courses.forEach(function(c){
       if(c.status!=='在读') return;
       if(c.weekday && c.weekday!==day) return;
@@ -959,23 +971,26 @@ function renderAttend(){
       pushGroup(c.subject, c.teacher, c.room, ck, clsLetter(ck, c.teacher),
         gradeKey(s.grade)+' · '+c.ctype+(c.level?' · '+c.level:''), s.id);
     });
-  } else if(ATT_SESSION==='晚自习'){
-    DB.schedule.filter(function(x){ return x.stype==='晚自习' && x.weekday===day && (!t || x.teacher===t); })
-      .forEach(function(x){
-        DB.students.filter(function(s){ return s.cls===x.cls; }).forEach(function(s){
-          pushGroup('晚自习', x.teacher || t || '未排值班', '', x.cls, x.cls, gradeKey(s.grade)+(x.slot?' · '+x.slot:''), s.id);
-        });
-      });
   } else {
     DB.students.filter(function(s){ return !t || s.owner===t || DB.courses.some(function(c){ return c.studentId===s.id && c.teacher===t && c.status==='在读'; }); })
       .forEach(function(s){
         pushGroup('送温暖', s.owner || t || '未分配', '', '送温暖', '送温暖', gradeKey(s.grade), s.id);
       });
   }
-
-  /* ---- 状态与统计 ---- */
   var seen={}, flat=[];
   S.forEach(function(A){ A.t.forEach(function(T){ T.cls.forEach(function(C){ C.ids.forEach(function(id){ if(!seen[id]){ seen[id]=1; flat.push(id); } }); }); }); });
+  return {S:S, flat:flat};
+}
+function renderAttend(){
+  var date = attDateVal();
+  var el = document.getElementById('attDate'); if(el && el.value.trim() && el.value.trim()!==date) el.value = date;
+  var t = attendTeacher();
+  var day = dayName(date);
+  var src = ATT_SESSION==='正课' ? '应到来源：课表全体班级'
+    : (ATT_SESSION==='晚自习' ? '应到来源：课表全体班级（晚自习）' : '应到来源：名下在读学生');
+
+  var tree = buildAttTree(date, ATT_SESSION, t);
+  var S = tree.S, flat = tree.flat;
   var st = {};
   flat.forEach(function(id){ var a = attOf(date, ATT_SESSION, id, t); st[id] = a ? a.status : '出勤'; });
 
@@ -1035,12 +1050,12 @@ function cycleAtt(date, session, sid, teacher){
   save(); renderAttend();
 }
 function setAll(v){
-  var date = document.getElementById('attDate').value || today();
+  var date = attDateVal();
   var t = attendTeacher();
-  roster(date, ATT_SESSION, t).forEach(function(x){
-    var a = attOf(date, ATT_SESSION, x.studentId, t);
+  buildAttTree(date, ATT_SESSION, t).flat.forEach(function(sid){
+    var a = attOf(date, ATT_SESSION, sid, t);
     if(a){ a.status=v; a.t=Date.now(); }
-    else DB.attendance.push({id:uid(), date:date, session:ATT_SESSION, studentId:x.studentId, teacher:t, status:v, t:Date.now()});
+    else DB.attendance.push({id:uid(), date:date, session:ATT_SESSION, studentId:sid, teacher:t, status:v, t:Date.now()});
   });
   save(); renderAttend();
 }
@@ -1051,9 +1066,9 @@ function renderWeek(date, t){
     days.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); }
   ['正课','晚自习','送温暖'].forEach(function(sess){
     days.forEach(function(dd){
-      var r = roster(dd, sess, t);
-      r.forEach(function(x){
-        var a = attOf(dd, sess, x.studentId, t); var stt = a?a.status:'出勤';
+      var r = buildAttTree(dd, sess, t).flat;
+      r.forEach(function(sid){
+        var a = attOf(dd, sess, sid, t); var stt = a?a.status:'出勤';
         var k = sess; rows[k]=rows[k]||{n:0,p:0}; rows[k].n++; if(stt==='出勤'||stt==='迟到') rows[k].p++;
       });
     });
