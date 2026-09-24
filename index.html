@@ -113,9 +113,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .tt-cls-meta{padding-top:1px}
 .tt-cls-meta .c{font-weight:700;color:var(--ink);font-size:12.5px}
 .tt-cls-meta .m{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.55}
-.tt-namelist{display:flex;flex-wrap:wrap;gap:4px}
-.tt-name{font-size:11px;padding:2px 7px;border-radius:5px;cursor:pointer;transition:.15s;
-  border:1px solid rgba(0,0,0,.06);white-space:nowrap;color:#24303d}
+.tt-namelist{display:flex;flex-wrap:wrap;gap:6px}
+.tt-name{font-size:13px;padding:4px 11px;border-radius:6px;cursor:pointer;transition:.15s;
+  border:1px solid rgba(0,0,0,.06);white-space:nowrap;color:#24303d;line-height:1.45}
 .tt-name:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(15,58,110,.16)}
 .tt-name.k1{background:#fdf1d0}
 .tt-name.k2{background:#efe3fb}
@@ -762,12 +762,20 @@ function setHL(id){
   var s = stuById(HL); var cs = DB.courses.filter(function(c){ return c.studentId===HL && c.status==='在读'; });
   document.getElementById('hlName').textContent = s.name + '（' + gradeKey(s.grade) + ' · ' + (s.cls||'') + '）';
   document.getElementById('hlBody').innerHTML = cs.length ? cs.map(function(c){
+      var letter = clsLetter(c.cls, c.teacher);
       return '<div class="li"><span><span class="chip" style="background:'+subColor(c.subject)+'">'+esc(c.subject)+'</span></span>'+
-        '<span style="text-align:right"><b>'+esc(c.teacher)+'</b><br><span class="mini">'+c.ctype+' · '+esc(c.weekday||'')+' '+esc(c.slot||'')+' · '+esc(c.room||'')+'</span></span></div>';
+        '<span style="text-align:right;line-height:1.7"><b>'+esc(c.teacher)+'</b>'+
+        '<br><span class="mini">'+esc(letter)+' 班　'+slotOf(letter)+(c.weekday? '　'+esc(c.weekday):'')+'</span>'+
+        '<br><span class="mini">教室：'+esc(c.room||'—')+'</span></span></div>';
     }).join('') : '<div class="mini">该生暂无在读课程</div>';
   p.style.display='block';
 }
 function clearHL(){ HL=null; renderStudents(); renderTT(); document.getElementById('hlPanel').style.display='none'; }
+/* 班次时间段：A:8:00-10:10  B:10:20-12:30  C:14:00-16:10  D:16:20-18:30 */
+function slotOf(letter){
+  var m = /[ABCD]/.exec(letter||'');
+  return ({A:'8:00-10:10', B:'10:20-12:30', C:'14:00-16:10', D:'16:20-18:30'})[m ? m[0] : ''] || '—';
+}
 
 /* ---------- 课表矩阵视图（Excel 式排布） ---------- */
 function stuSubjectCount(){
@@ -948,18 +956,20 @@ function roster(dateStr, session, teacher){
 function attOf(dateStr, session, sid, teacher){
   return DB.attendance.filter(function(a){ return a.date===dateStr && a.session===session && a.studentId===sid && (!teacher||a.teacher===teacher); })[0];
 }
-/* 应到名单分组树：科目 → 老师 → 班级（正课 / 晚自习都按课表全体班级；送温暖按名下学生） */
+/* 应到名单分组树：科目 → 老师 → 班级（正课 / 晚自习都按课表全体班级；送温暖按名下学生）
+   统计口径：按课次 —— 一门课 = 一次；一名学生学三科 = 3 课次 */
 function buildAttTree(date, session, t){
-  var day = dayName(date), S=[], sIdx={};
+  var day = dayName(date), S=[], sIdx={}, flat=[];
   function pushGroup(subj, teacher, room, ck, letter, meta, sid){
     if(!sIdx[subj]){ sIdx[subj]={name:subj, t:[], tIdx:{}, n:0}; S.push(sIdx[subj]); }
     var A = sIdx[subj];
     if(!A.tIdx[teacher]){ A.tIdx[teacher]={name:teacher, room:room||'', cls:[], cIdx:{}, n:0}; A.t.push(A.tIdx[teacher]); }
     var T = A.tIdx[teacher];
-    if(!T.cIdx[ck]){ T.cIdx[ck]={name:ck, letter:letter, meta:meta, ids:[], seen:{}}; T.cls.push(T.cIdx[ck]); }
+    if(!T.cIdx[ck]){ T.cIdx[ck]={name:ck, letter:letter, meta:meta, ids:[], seen:{}, n:0}; T.cls.push(T.cIdx[ck]); }
     var C = T.cIdx[ck];
     if(!C.seen[sid]){ C.seen[sid]=1; C.ids.push(sid); }
-    T.n++; A.n++;
+    C.n++; T.n++; A.n++;
+    flat.push(sid);
   }
   if(session==='正课' || session==='晚自习'){
     DB.courses.forEach(function(c){
@@ -977,8 +987,6 @@ function buildAttTree(date, session, t){
         pushGroup('送温暖', s.owner || t || '未分配', '', '送温暖', '送温暖', gradeKey(s.grade), s.id);
       });
   }
-  var seen={}, flat=[];
-  S.forEach(function(A){ A.t.forEach(function(T){ T.cls.forEach(function(C){ C.ids.forEach(function(id){ if(!seen[id]){ seen[id]=1; flat.push(id); } }); }); }); });
   return {S:S, flat:flat};
 }
 function renderAttend(){
@@ -992,9 +1000,10 @@ function renderAttend(){
   var tree = buildAttTree(date, ATT_SESSION, t);
   var S = tree.S, flat = tree.flat;
   var st = {};
-  flat.forEach(function(id){ var a = attOf(date, ATT_SESSION, id, t); st[id] = a ? a.status : '出勤'; });
+  var uniqN = 0, seenU = {};
+  flat.forEach(function(id){ if(!seenU[id]){ seenU[id]=1; uniqN++; } var a = attOf(date, ATT_SESSION, id, t); st[id] = a ? a.status : '出勤'; });
 
-  document.getElementById('attSrc').textContent = src + '（' + day + '）· 应到 ' + flat.length + ' 人';
+  document.getElementById('attSrc').textContent = src + '（' + day + '）· 应到 ' + flat.length + ' 课次（' + uniqN + ' 人）';
 
   var vals = flat.map(function(id){ return st[id]; });
   var present = vals.filter(function(v){ return v==='出勤'||v==='迟到'; }).length;
@@ -1002,7 +1011,7 @@ function renderAttend(){
   var leave = vals.filter(function(v){ return v==='请假'; }).length;
   var absent= vals.filter(function(v){ return v==='缺勤'; }).length;
   document.getElementById('rateV').textContent = pct(present, vals.length)+'%';
-  document.getElementById('rateDetail').innerHTML = '应到 <b>'+vals.length+'</b> 人 ｜ 实到 <b>'+present+'</b> 人（含迟到 '+late+'）｜ 请假 '+leave+' ｜ 缺勤 '+absent;
+  document.getElementById('rateDetail').innerHTML = '应到 <b>'+vals.length+'</b> 课次（'+uniqN+' 人）｜ 实到 <b>'+present+'</b> 课次（含迟到 '+late+'）｜ 请假 '+leave+' ｜ 缺勤 '+absent;
 
   /* ---- 矩阵渲染（与课表页一致） ---- */
   var html = S.length ? S.map(function(A){
@@ -1010,15 +1019,15 @@ function renderAttend(){
     var stun = {}; A.t.forEach(function(T){ T.cls.forEach(function(C){ C.ids.forEach(function(id){ stun[id]=1; }); }); });
     var out = '<div class="tt-subj" style="--sc:'+col+'">'+
       '<div class="tt-subj-bar" style="background:linear-gradient(90deg,'+col+','+col+'cc)">'+
-        '<b>'+esc(A.name)+'</b><span class="n">'+A.n+' 人次</span>'+
+        '<b>'+esc(A.name)+'</b><span class="n">'+A.n+' 课次</span>'+
         '<span class="sp"></span><span class="info">'+Object.keys(stun).length+' 人 · '+A.t.length+' 位老师</span>'+
       '</div>';
     out += A.t.map(function(T){
-      var n = T.cls.reduce(function(a,c){ return a+c.ids.length; },0);
+      var n = T.cls.reduce(function(a,c){ return a+c.n; },0);
       return '<div class="tt-tch">'+
         '<div class="tt-tch-hd"><span class="nm">'+esc(T.name)+'</span>'+
           (T.room? '<span class="room">教室 '+esc(T.room)+'</span>':'')+
-          '<span class="cnt">'+n+' 人</span></div>'+
+          '<span class="cnt">'+n+' 课次</span></div>'+
         T.cls.map(function(C){
           var names = C.ids.map(function(id){
             var s = stuById(id); if(!s) return '';
@@ -1029,7 +1038,7 @@ function renderAttend(){
           var cAb = cst.filter(function(v){ return v==='缺勤'; }).length;
           var cLv = cst.filter(function(v){ return v==='请假'; }).length;
           return '<div class="tt-cls"><div class="tt-cls-meta"><div class="c">'+esc(C.letter)+'</div>'+
-            '<div class="m">'+esc(C.meta||'')+'<br><b style="color:var(--blue-700);font-size:12px">'+C.ids.length+'</b> 人'+
+            '<div class="m">'+esc(C.meta||'')+'<br><b style="color:var(--blue-700);font-size:12px">'+C.n+'</b> 课次'+
             (cAb? ' · <span style="color:#c0392b">缺'+cAb+'</span>':'')+(cLv? ' · <span style="color:#6b7684">假'+cLv+'</span>':'')+'</div></div>'+
             '<div class="tt-namelist">'+names+'</div></div>';
         }).join('') + '</div>';
@@ -1052,7 +1061,9 @@ function cycleAtt(date, session, sid, teacher){
 function setAll(v){
   var date = attDateVal();
   var t = attendTeacher();
+  var seen = {};
   buildAttTree(date, ATT_SESSION, t).flat.forEach(function(sid){
+    if(seen[sid]) return; seen[sid]=1;
     var a = attOf(date, ATT_SESSION, sid, t);
     if(a){ a.status=v; a.t=Date.now(); }
     else DB.attendance.push({id:uid(), date:date, session:ATT_SESSION, studentId:sid, teacher:t, status:v, t:Date.now()});
@@ -1073,7 +1084,7 @@ function renderWeek(date, t){
       });
     });
   });
-  document.getElementById('weekTbl').innerHTML = '<thead><tr><th>场次</th><th class="num">应到人次数</th><th class="num">实到人次数</th><th class="num">出勤率</th></tr></thead><tbody>'+
+  document.getElementById('weekTbl').innerHTML = '<thead><tr><th>场次</th><th class="num">应到课次</th><th class="num">实到课次</th><th class="num">出勤率</th></tr></thead><tbody>'+
     (Object.keys(rows).length? Object.keys(rows).map(function(k){
       return '<tr><td>'+k+'</td><td class="num">'+rows[k].n+'</td><td class="num">'+rows[k].p+'</td><td class="num"><b>'+pct(rows[k].p,rows[k].n)+'%</b></td></tr>'; }).join('')
       : '<tr><td colspan="4" class="empty">本周暂无排班</td></tr>')+'</tbody>';
