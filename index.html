@@ -156,6 +156,7 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
     <div class="brand">校区 AI 工作台<small>科目数 · 出勤 · 总控看板</small></div>
     <div class="spacer"></div>
     <div class="who" id="who">—</div>
+    <div class="who" id="syncState" title="云端同步状态">本机模式</div>
     <button class="ghost" onclick="exportJSON()">导出数据</button>
     <button class="ghost" onclick="doLogout()">退出</button>
   </div>
@@ -329,6 +330,20 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
       </div>
 
       <div class="card">
+        <h3>云端同步（多设备实时联动） <span class="tag">老师手机打卡 → 校长页面立刻看到</span></h3>
+        <div class="note">填一个「同步接口地址 + 通信密钥」就开启；不填就是单机模式，功能照常用，数据存本机。<br>后端我已经写好两份现成脚本（Cloudflare Worker / 腾讯云函数），你开通哪个就把对应脚本粘进去，拿到地址填这里即可。</div>
+        <div class="toolbar">
+          <input id="clUrl" placeholder="同步接口地址，如 https://xxx.workers.dev/api" style="min-width:300px">
+          <input id="clKey" placeholder="通信密钥" style="width:170px">
+          <label class="switch"><input type="checkbox" id="clOn"> 开启自动同步</label>
+          <button class="btn" onclick="saveCloudCfg()">保存并连接</button>
+          <button class="btn gray" onclick="cloudPull(true)">立即拉取</button>
+          <button class="btn g" onclick="cloudPush(true)">立即上传</button>
+        </div>
+        <div class="mini" id="clMsg" style="margin-top:6px"></div>
+      </div>
+
+      <div class="card">
         <h3>数据</h3>
         <div class="row-actions">
           <button class="btn" onclick="exportJSON()">导出全部数据（JSON 备份）</button>
@@ -367,11 +382,12 @@ function dayName(dateStr){ var d=new Date(dateStr+'T00:00:00'); return DAYS[(d.g
 function weekStart(dateStr){ var d=new Date(dateStr+'T00:00:00'); var w=(d.getDay()+6)%7; d.setDate(d.getDate()-w);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
-function save(){ try{ localStorage.setItem(LS, JSON.stringify(DB)); }catch(e){ alert('保存失败：'+e.message); } }
+function save(localOnly){ try{ localStorage.setItem(LS, JSON.stringify(DB)); }catch(e){ alert('保存失败：'+e.message); }
+  if(!localOnly) cloudPush(); }
 function load(){
   var raw = localStorage.getItem(LS);
   if(raw){ try{ DB = JSON.parse(raw); }catch(e){ DB = null; } }
-  if(!DB || !DB.students){ DB = seed(); save(); }
+  if(!DB || !DB.students){ DB = seed(); save(true); }
   if(!DB.subjectColors) DB.subjectColors = {};
   if(!DB.accounts) DB.accounts = [];
   if(!DB.schedule) DB.schedule = [];
@@ -418,6 +434,77 @@ function seed(){
   };
 }
 
+/* ================= 云端同步 ================= */
+var CLOUD = {on:false, url:'', key:''}, _pushT = null, _pullT = null;
+function loadCloudCfg(){
+  try{ var c = JSON.parse(localStorage.getItem(LS+'_cloud')||'{}');
+    CLOUD.on=!!c.on; CLOUD.url=c.url||''; CLOUD.key=c.key||''; }catch(e){}
+  var a=document.getElementById('clUrl'), b=document.getElementById('clKey'), c2=document.getElementById('clOn');
+  if(a){ a.value=CLOUD.url; b.value=CLOUD.key; c2.checked=CLOUD.on; }
+  if(!CLOUD.on) setSync('本机模式');
+}
+function saveCloudCfg(){
+  CLOUD.url = document.getElementById('clUrl').value.trim();
+  CLOUD.key = document.getElementById('clKey').value.trim();
+  CLOUD.on  = document.getElementById('clOn').checked;
+  localStorage.setItem(LS+'_cloud', JSON.stringify({on:CLOUD.on, url:CLOUD.url, key:CLOUD.key}));
+  document.getElementById('clMsg').textContent = CLOUD.on ? '已保存，正在连接…' : '已关闭同步（数据存本机）';
+  if(CLOUD.on){ cloudPull(true); startAutoPull(); } else { setSync('本机模式'); stopAutoPull(); }
+}
+function setSync(s){ var e=document.getElementById('syncState'); if(e) e.textContent=s; }
+function cloudHeaders(){ var h={'Content-Type':'application/json'}; if(CLOUD.key) h['x-sync-key']=CLOUD.key; return h; }
+function cloudPush(manual){
+  if(!CLOUD.on || !CLOUD.url){ if(manual) alert('请先开启同步并填写接口地址'); return; }
+  clearTimeout(_pushT);
+  var go = function(){
+    setSync('同步中…');
+    fetch(CLOUD.url, {method:'POST', headers:cloudHeaders(), body:JSON.stringify({key:'campus', data:DB, t:Date.now()})})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+      .then(function(){ setSync('已同步 '+new Date().toLocaleTimeString().slice(0,8));
+        var m=document.getElementById('clMsg'); if(m && manual) m.textContent='上传成功'; if(manual) alert('上传成功'); })
+      .catch(function(e){ setSync('离线（本机已保存）');
+        var m=document.getElementById('clMsg'); if(m && manual) m.textContent='上传失败：'+e.message; if(manual) alert('上传失败：'+e.message); });
+  };
+  if(manual) go(); else _pushT = setTimeout(go, 800);
+}
+function cloudPull(manual){
+  if(!CLOUD.on || !CLOUD.url){ if(manual) alert('请先开启同步并填写接口地址'); return Promise.resolve(); }
+  setSync('拉取中…');
+  return fetch(CLOUD.url+'?key=campus', {headers:cloudHeaders()})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(j){
+      var d = j && (j.data || j.doc || j.payload);
+      if(d && d.courses){
+        var before = (DB.attendance||[]).length;
+        mergeDB(d); save(true); if(ME){ fillSelects(); renderAll(); }
+        var after = (DB.attendance||[]).length;
+        setSync('已同步 ' + new Date().toLocaleTimeString().slice(0,8));
+        if(manual) alert('拉取成功：出勤记录 ' + before + ' → ' + after + ' 条（已按最新时间合并，不会覆盖别人的打卡）');
+      }else{
+        setSync('云端暂无数据');
+        if(manual) alert('接口通了，但云端还没有数据。请点「立即上传」把本机数据推上去。');
+      }
+    })
+    .catch(function(e){ setSync('离线（用本机数据）');
+      var m=document.getElementById('clMsg'); if(m && manual) m.textContent='连接失败：'+e.message; if(manual) alert('连接失败：'+e.message); });
+}
+function mergeDB(d){
+  var m = {};
+  (DB.attendance||[]).concat(d.attendance||[]).forEach(function(r){
+    var k = r.date+'|'+r.session+'|'+r.studentId+'|'+(r.teacher||'');
+    if(!m[k] || (r.t||0) > (m[k].t||0)) m[k] = r;
+  });
+  if(d.students && d.students.length) DB.students = d.students;
+  if(d.courses && d.courses.length) DB.courses = d.courses;
+  if(d.schedule) DB.schedule = d.schedule;
+  if(d.accounts && d.accounts.length) DB.accounts = d.accounts;
+  if(d.subjectColors) DB.subjectColors = d.subjectColors;
+  DB.attendance = Object.keys(m).map(function(k){ return m[k]; });
+}
+function startAutoPull(){ stopAutoPull(); if(!CLOUD.on) return;
+  _pullT = setInterval(function(){ cloudPull(); }, 30000); }
+function stopAutoPull(){ if(_pullT){ clearInterval(_pullT); _pullT=null; } }
+
 /* ================= 登录 ================= */
 function doLogin(){
   var name = document.getElementById('lgName').value.trim();
@@ -433,8 +520,10 @@ function doLogin(){
   document.getElementById('app').style.display='block';
   document.getElementById('who').textContent = acc.name + ' · ' + ({teacher:'任课老师',head:'班主任',master:'校长'})[acc.role];
   initUI();
+  loadCloudCfg();
+  if(CLOUD.on){ cloudPull(); startAutoPull(); }
 }
-function doLogout(){ ME=null; document.getElementById('login').style.display='flex'; document.getElementById('app').style.display='none'; }
+function doLogout(){ stopAutoPull(); ME=null; document.getElementById('login').style.display='flex'; document.getElementById('app').style.display='none'; }
 function isBoss(){ return ME && (ME.role==='head'||ME.role==='master'); }
 
 /* ================= 通用 ================= */
@@ -709,7 +798,8 @@ function cycleAtt(date, session, sid, teacher){
   var a = attOf(date, session, sid, teacher);
   var cur = a ? a.status : '出勤';
   var nx = order[(order.indexOf(cur)+1)%4];
-  if(a){ a.status = nx; } else { DB.attendance.push({id:uid(), date:date, session:session, studentId:sid, teacher:teacher, status:nx}); }
+  if(a){ a.status = nx; a.t = Date.now(); }
+  else { DB.attendance.push({id:uid(), date:date, session:session, studentId:sid, teacher:teacher, status:nx, t:Date.now()}); }
   save(); renderAttend();
 }
 function setAll(v){
@@ -717,7 +807,8 @@ function setAll(v){
   var t = attendTeacher();
   roster(date, ATT_SESSION, t).forEach(function(x){
     var a = attOf(date, ATT_SESSION, x.studentId, t);
-    if(a) a.status=v; else DB.attendance.push({id:uid(), date:date, session:ATT_SESSION, studentId:x.studentId, teacher:t, status:v});
+    if(a){ a.status=v; a.t=Date.now(); }
+    else DB.attendance.push({id:uid(), date:date, session:ATT_SESSION, studentId:x.studentId, teacher:t, status:v, t:Date.now()});
   });
   save(); renderAttend();
 }
@@ -871,6 +962,7 @@ function clearAll(){ if(!confirm('确定清空全部数据？建议先导出备�
 
 /* ================= 启动 ================= */
 load();
+loadCloudCfg();
 </script>
 </body>
 </html>
