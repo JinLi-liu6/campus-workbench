@@ -176,18 +176,24 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
   <div class="login-box">
     <h1>校区 AI 工作台</h1>
     <p class="sub">科目数实时统计 · 出勤联动打卡</p>
-    <label>身份</label>
-    <select id="lgRole">
-      <option value="teacher">任课老师</option>
-      <option value="head">班主任（总控）</option>
-      <option value="master">校长（总控）</option>
-    </select>
-    <label>姓名</label>
-    <input id="lgName" placeholder="如：陶老师" autocomplete="off">
+    <label>选择账号</label>
+    <select id="lgAcc"></select>
     <label>密码</label>
     <input id="lgPwd" type="password" placeholder="默认 123456" autocomplete="off">
     <button class="btn" onclick="doLogin()">进入工作台</button>
-    <div class="tip">演示账号：陶老师 / 李老师 / 王老师 / 张老师 / 班主任 / 校长<br>默认密码统一 123456（可在「设置」里改）</div>
+    <div style="margin-top:10px"><button class="btn gray" onclick="toggleNewAcc()" id="lgNewBtn">账号不在列表里？新建一个</button></div>
+    <div id="lgNew" style="display:none;margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+      <label>身份</label>
+      <select id="lgRole">
+        <option value="teacher">任课老师</option>
+        <option value="head">班主任</option>
+        <option value="vice">副校长</option>
+        <option value="master">校长</option>
+      </select>
+      <label>姓名</label>
+      <input id="lgName" placeholder="如：陶老师" autocomplete="off">
+    </div>
+    <div class="tip">内置 6 个管理账号：校长 ×1、副校长 ×2、班主任 ×3，另含课表里 22 位任课老师账号<br>默认密码统一 123456（可在「设置 → 账号」里改）</div>
   </div>
 </div>
 
@@ -197,7 +203,7 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
     <div class="brand">校区 AI 工作台<small>科目数 · 出勤 · 总控看板</small></div>
     <div class="spacer"></div>
     <div class="who" id="who">—</div>
-    <div class="who" id="syncState" title="云端同步状态">本机模式</div>
+    <div class="who" id="syncState" title="数据保存在本机浏览器">💾 数据存本机</div>
     <button class="ghost" onclick="exportJSON()">导出数据</button>
     <button class="ghost" onclick="doLogout()">退出</button>
   </div>
@@ -404,24 +410,17 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
         <div class="tbl-scroll" style="max-height:240px"><table id="accTbl"></table></div>
         <div class="toolbar" style="margin-top:10px">
           <input id="acName" placeholder="姓名" style="width:110px">
-          <select id="acRole"><option value="teacher">任课老师</option><option value="head">班主任</option><option value="master">校长</option></select>
+          <select id="acRole"><option value="teacher">任课老师</option><option value="head">班主任</option><option value="vice">副校长</option><option value="master">校长</option></select>
           <input id="acPwd" placeholder="密码" style="width:110px" value="123456">
           <button class="btn g sm" onclick="addAccount()">+ 新增账号</button>
         </div>
       </div>
 
       <div class="card">
-        <h3>云端同步（多设备实时联动） <span class="tag">老师手机打卡 → 校长页面立刻看到</span></h3>
-        <div class="note">填一个「同步接口地址 + 通信密钥」就开启；不填就是单机模式，功能照常用，数据存本机。<br>后端我已经写好两份现成脚本（Cloudflare Worker / 腾讯云函数），你开通哪个就把对应脚本粘进去，拿到地址填这里即可。</div>
-        <div class="toolbar">
-          <input id="clUrl" placeholder="同步接口地址，如 https://xxx.workers.dev/api" style="min-width:300px">
-          <input id="clKey" placeholder="通信密钥" style="width:170px">
-          <label class="switch"><input type="checkbox" id="clOn"> 开启自动同步</label>
-          <button class="btn" onclick="saveCloudCfg()">保存并连接</button>
-          <button class="btn gray" onclick="cloudPull(true)">立即拉取</button>
-          <button class="btn g" onclick="cloudPush(true)">立即上传</button>
-        </div>
-        <div class="mini" id="clMsg" style="margin-top:6px"></div>
+        <h3>数据存储方式 <span class="tag">纯本机，不联网</span></h3>
+        <div class="note">所有数据（课表、科目数、出勤记录、账号）都保存在<b>这台设备的浏览器</b>里，不上传任何服务器、不需要联网，关机后依然在。<br>
+        换设备 / 换人使用：在 A 机器点「导出全部数据（JSON 备份）」，把文件传给 B 机器，在 B 机器「导入 JSON 备份」即可。<br>
+        <b>建议每周导出一次</b>存到网盘或 U 盘，作为备份。</div>
       </div>
 
       <div class="card">
@@ -434,9 +433,8 @@ textarea.import{width:100%;min-height:150px;border:1px solid var(--line);border-
           <button class="btn danger" onclick="clearAll()">清空全部数据</button>
         </div>
         <div class="mini" style="margin-top:10px;line-height:1.8">
-          数据保存在本机浏览器（localStorage），不上传服务器、不联网。多设备同步请用「导出 JSON → 另一台导入」。<br>
-          如需真正多人实时联动（老师手机打卡、校长网页实时看到），需要配一个后端数据库 —— 这一步等你确认要不要上。
-        </div>
+          数据保存在本机浏览器（localStorage），<b>不上传服务器、不联网</b>；换浏览器或清缓存会丢，记得定期导出备份。<br>
+          多设备使用：导出 JSON → 另一台导入。<b>多人实时联动已确定不做</b>，各人本机操作，需要合并时用导出 / 导入。</div>
       </div>
     </div>
 
@@ -481,8 +479,7 @@ function dayName(dateStr){ var d=new Date(dateStr+'T00:00:00'); return DAYS[(d.g
 function weekStart(dateStr){ var d=new Date(dateStr+'T00:00:00'); var w=(d.getDay()+6)%7; d.setDate(d.getDate()-w);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
-function save(localOnly){ try{ localStorage.setItem(LS, JSON.stringify(DB)); }catch(e){ alert('保存失败：'+e.message); }
-  if(!localOnly) cloudPush(); }
+function save(localOnly){ try{ localStorage.setItem(LS, JSON.stringify(DB)); }catch(e){ alert('保存失败：'+e.message); } }
 function load(){
   var raw = localStorage.getItem(LS);
   if(raw){ try{ DB = JSON.parse(raw); }catch(e){ DB = null; } }
@@ -491,6 +488,49 @@ function load(){
   if(!DB.accounts) DB.accounts = [];
   if(!DB.schedule) DB.schedule = [];
   if(!DB.attendance) DB.attendance = [];
+  ensureBuiltinAccounts();
+}
+
+/* 内置管理账号：校长 1 + 副校长 2 + 班主任 3（均为总控权限，看全校数据） */
+var BUILTIN_ACCOUNTS = [
+  {id:'acc_master', name:'校长',    role:'master', pwd:'123456', builtin:1},
+  {id:'acc_vice1',  name:'副校长①', role:'vice',   pwd:'123456', builtin:1},
+  {id:'acc_vice2',  name:'副校长②', role:'vice',   pwd:'123456', builtin:1},
+  {id:'acc_head1',  name:'班主任①', role:'head',   pwd:'123456', builtin:1},
+  {id:'acc_head2',  name:'班主任②', role:'head',   pwd:'123456', builtin:1},
+  {id:'acc_head3',  name:'班主任③', role:'head',   pwd:'123456', builtin:1}
+];
+var ROLE_LABEL = {teacher:'任课老师', head:'班主任', vice:'副校长', master:'校长'};
+function ensureBuiltinAccounts(){
+  if(!DB.accounts) DB.accounts = [];
+  var byId = {}, byName = {};
+  DB.accounts.forEach(function(a){ if(a.id) byId[a.id]=a; if(a.name) byName[a.name]=a; });
+  var changed = false;
+  BUILTIN_ACCOUNTS.forEach(function(b){
+    if(byId[b.id]){ if(!byId[b.id].builtin){ byId[b.id].builtin=1; changed=true; } return; }
+    DB.accounts.unshift(Object.assign({}, b)); changed = true;
+  });
+  if(changed) save(true);
+}
+function fillLoginAcc(){
+  var sel = document.getElementById('lgAcc'); if(!sel) return;
+  ensureBuiltinAccounts();
+  var order = ['master','vice','head','teacher'];
+  var groups = {};
+  DB.accounts.forEach(function(a){ (groups[a.role] = groups[a.role] || []).push(a); });
+  var html = '';
+  order.forEach(function(r){
+    var g = groups[r]; if(!g || !g.length) return;
+    html += '<optgroup label="'+ROLE_LABEL[r]+'（'+g.length+'）">'+
+      g.map(function(a){ return '<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>'; }).join('')+'</optgroup>';
+  });
+  sel.innerHTML = html;
+}
+function toggleNewAcc(){
+  var box = document.getElementById('lgNew'); if(!box) return;
+  var on = box.style.display==='none';
+  box.style.display = on ? 'block' : 'none';
+  document.getElementById('lgNewBtn').textContent = on ? '收起新建' : '账号不在列表里？新建一个';
 }
 
 /* ================= 示例数据 ================= */
@@ -533,98 +573,35 @@ function seed(){
   };
 }
 
-/* ================= 云端同步 ================= */
-var CLOUD = {on:false, url:'', key:''}, _pushT = null, _pullT = null;
-function loadCloudCfg(){
-  try{ var c = JSON.parse(localStorage.getItem(LS+'_cloud')||'{}');
-    CLOUD.on=!!c.on; CLOUD.url=c.url||''; CLOUD.key=c.key||''; }catch(e){}
-  var a=document.getElementById('clUrl'), b=document.getElementById('clKey'), c2=document.getElementById('clOn');
-  if(a){ a.value=CLOUD.url; b.value=CLOUD.key; c2.checked=CLOUD.on; }
-  if(!CLOUD.on) setSync('本机模式');
-}
-function saveCloudCfg(){
-  CLOUD.url = document.getElementById('clUrl').value.trim();
-  CLOUD.key = document.getElementById('clKey').value.trim();
-  CLOUD.on  = document.getElementById('clOn').checked;
-  localStorage.setItem(LS+'_cloud', JSON.stringify({on:CLOUD.on, url:CLOUD.url, key:CLOUD.key}));
-  document.getElementById('clMsg').textContent = CLOUD.on ? '已保存，正在连接…' : '已关闭同步（数据存本机）';
-  if(CLOUD.on){ cloudPull(true); startAutoPull(); } else { setSync('本机模式'); stopAutoPull(); }
-}
-function setSync(s){ var e=document.getElementById('syncState'); if(e) e.textContent=s; }
-function cloudHeaders(){ var h={'Content-Type':'application/json'}; if(CLOUD.key) h['x-sync-key']=CLOUD.key; return h; }
-function cloudPush(manual){
-  if(!CLOUD.on || !CLOUD.url){ if(manual) alert('请先开启同步并填写接口地址'); return; }
-  clearTimeout(_pushT);
-  var go = function(){
-    setSync('同步中…');
-    fetch(CLOUD.url, {method:'POST', headers:cloudHeaders(), body:JSON.stringify({key:'campus', data:DB, t:Date.now()})})
-      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
-      .then(function(){ setSync('已同步 '+new Date().toLocaleTimeString().slice(0,8));
-        var m=document.getElementById('clMsg'); if(m && manual) m.textContent='上传成功'; if(manual) alert('上传成功'); })
-      .catch(function(e){ setSync('离线（本机已保存）');
-        var m=document.getElementById('clMsg'); if(m && manual) m.textContent='上传失败：'+e.message; if(manual) alert('上传失败：'+e.message); });
-  };
-  if(manual) go(); else _pushT = setTimeout(go, 800);
-}
-function cloudPull(manual){
-  if(!CLOUD.on || !CLOUD.url){ if(manual) alert('请先开启同步并填写接口地址'); return Promise.resolve(); }
-  setSync('拉取中…');
-  return fetch(CLOUD.url+'?key=campus', {headers:cloudHeaders()})
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(function(j){
-      var d = j && (j.data || j.doc || j.payload);
-      if(d && d.courses){
-        var before = (DB.attendance||[]).length;
-        mergeDB(d); save(true); if(ME){ fillSelects(); renderAll(); }
-        var after = (DB.attendance||[]).length;
-        setSync('已同步 ' + new Date().toLocaleTimeString().slice(0,8));
-        if(manual) alert('拉取成功：出勤记录 ' + before + ' → ' + after + ' 条（已按最新时间合并，不会覆盖别人的打卡）');
-      }else{
-        setSync('云端暂无数据');
-        if(manual) alert('接口通了，但云端还没有数据。请点「立即上传」把本机数据推上去。');
-      }
-    })
-    .catch(function(e){ setSync('离线（用本机数据）');
-      var m=document.getElementById('clMsg'); if(m && manual) m.textContent='连接失败：'+e.message; if(manual) alert('连接失败：'+e.message); });
-}
-function mergeDB(d){
-  var m = {};
-  (DB.attendance||[]).concat(d.attendance||[]).forEach(function(r){
-    var k = r.date+'|'+r.session+'|'+r.studentId+'|'+(r.teacher||'');
-    if(!m[k] || (r.t||0) > (m[k].t||0)) m[k] = r;
-  });
-  if(d.students && d.students.length) DB.students = d.students;
-  if(d.courses && d.courses.length) DB.courses = d.courses;
-  if(d.schedule) DB.schedule = d.schedule;
-  if(d.accounts && d.accounts.length) DB.accounts = d.accounts;
-  if(d.subjectColors) DB.subjectColors = d.subjectColors;
-  DB.attendance = Object.keys(m).map(function(k){ return m[k]; });
-}
-function startAutoPull(){ stopAutoPull(); if(!CLOUD.on) return;
-  _pullT = setInterval(function(){ cloudPull(); }, 30000); }
-function stopAutoPull(){ if(_pullT){ clearInterval(_pullT); _pullT=null; } }
-
 /* ================= 登录 ================= */
 function doLogin(){
-  var name = document.getElementById('lgName').value.trim();
   var pwd = document.getElementById('lgPwd').value.trim() || '123456';
-  var role = document.getElementById('lgRole').value;
-  if(!name){ alert('请输入姓名'); return; }
-  var acc = DB.accounts.filter(function(a){ return a.name===name; })[0];
-  if(!acc){ if(!confirm('没有找到账号「'+name+'」，要用当前身份新建一个吗？')) return;
-    acc = {id:uid(), name:name, role:role, pwd:pwd}; DB.accounts.push(acc); save(); }
-  else if(acc.pwd && acc.pwd !== pwd){ alert('密码不对'); return; }
+  var name = document.getElementById('lgName').value.trim();
+  var newOpen = document.getElementById('lgNew') && document.getElementById('lgNew').style.display !== 'none';
+  var acc;
+  if(newOpen && name){
+    var role = document.getElementById('lgRole').value;
+    acc = DB.accounts.filter(function(a){ return a.name===name; })[0];
+    if(!acc){ if(!confirm('没有找到账号「'+name+'」，要用当前身份新建一个吗？')) return;
+      acc = {id:uid(), name:name, role:role, pwd:pwd}; DB.accounts.push(acc); save(); }
+  }else{
+    var aid = document.getElementById('lgAcc').value;
+    acc = DB.accounts.filter(function(a){ return a.id===aid; })[0];
+    if(!acc){ alert('请选择一个账号'); return; }
+  }
+  if(acc.pwd && acc.pwd !== pwd){ alert('密码不对'); return; }
   ME = acc;
   document.getElementById('attTeacher').value = '';   // 换账号登录时清掉上一个账号的老师筛选，防止总控只看到上一位老师的课
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
-  document.getElementById('who').textContent = acc.name + ' · ' + ({teacher:'任课老师',head:'班主任',master:'校长'})[acc.role];
+  document.getElementById('who').textContent = acc.name + ' · ' + (ROLE_LABEL[acc.role]||acc.role);
   initUI();
-  loadCloudCfg();
-  if(CLOUD.on){ cloudPull(); startAutoPull(); }
 }
-function doLogout(){ stopAutoPull(); ME=null; document.getElementById('login').style.display='flex'; document.getElementById('app').style.display='none'; }
-function isBoss(){ return ME && (ME.role==='head'||ME.role==='master'); }
+function doLogout(){ ME=null;
+  document.getElementById('lgPwd').value='';
+  fillLoginAcc();
+  document.getElementById('login').style.display='flex'; document.getElementById('app').style.display='none'; }
+function isBoss(){ return ME && (ME.role==='head'||ME.role==='master'||ME.role==='vice'); }
 
 /* ================= 通用 ================= */
 function subColor(s){ return (DB.subjectColors && DB.subjectColors[s]) || SUBJ_COLORS[s] || '#8a94a6'; }
@@ -947,7 +924,7 @@ function delSchedule(id){ DB.schedule=DB.schedule.filter(function(s){return s.id
 function fillSelects(){
   var ts = {};
   DB.courses.forEach(function(c){ if(c.status==='在读') ts[c.teacher]=1; });
-  DB.accounts.forEach(function(a){ ts[a.name]=1; });
+  DB.accounts.forEach(function(a){ if(a.role==='teacher') ts[a.name]=1; });
   var names = Object.keys(ts);
   var sel = document.getElementById('attTeacher');
   var cur = sel.value;
@@ -1198,15 +1175,38 @@ function setColor(s,v){ DB.subjectColors=DB.subjectColors||{}; DB.subjectColors[
 function renderAccounts(){
   document.getElementById('accTbl').innerHTML = '<thead><tr><th>姓名</th><th>角色</th><th>密码</th><th>操作</th></tr></thead><tbody>'+
     DB.accounts.map(function(a){
-      return '<tr><td>'+esc(a.name)+'</td><td>'+({teacher:'任课老师',head:'班主任',master:'校长'})[a.role]+'</td><td>'+esc(a.pwd||'')+'</td>'+
-        '<td><button class="btn gray sm" onclick="delAccount(\''+a.id+'\')">删除</button></td></tr>'; }).join('')+'</tbody>';
+      return '<tr'+(a.builtin?' style="background:var(--blue-50)"':'')+'><td>'+esc(a.name)+
+        (a.builtin? ' <span class="tag">内置</span>':'')+'</td><td>'+(ROLE_LABEL[a.role]||a.role)+'</td><td>'+esc(a.pwd||'')+'</td>'+
+        '<td><div class="row-actions">'+
+          '<button class="btn gray sm" onclick="renameAccount(\''+a.id+'\')">改名</button>'+
+          '<button class="btn gray sm" onclick="chgPwd(\''+a.id+'\')">改密码</button>'+
+          (a.builtin? '' : '<button class="btn danger sm" onclick="delAccount(\''+a.id+'\')">删除</button>')+
+        '</div></td></tr>'; }).join('')+'</tbody>';
+}
+function renameAccount(id){
+  var a = DB.accounts.filter(function(x){ return x.id===id; })[0]; if(!a) return;
+  var n = prompt('把「'+a.name+'」改名为：', a.name); if(n===null) return;
+  n = n.trim(); if(!n){ alert('名字不能为空'); return; }
+  if(DB.accounts.some(function(x){ return x.id!==id && x.name===n; })){ alert('已经有同名账号了'); return; }
+  a.name = n; save(); renderAccounts(); fillSelects(); fillLoginAcc();
+  if(ME && ME.id===id){ ME = a; document.getElementById('who').textContent = a.name + ' · ' + (ROLE_LABEL[a.role]||a.role); }
+}
+function chgPwd(id){
+  var a = DB.accounts.filter(function(x){ return x.id===id; })[0]; if(!a) return;
+  var p = prompt('给「'+a.name+'」设置新密码：', a.pwd||''); if(p===null) return;
+  p = p.trim(); if(!p){ alert('密码不能为空'); return; }
+  a.pwd = p; save(); renderAccounts();
 }
 function addAccount(){
   var n=document.getElementById('acName').value.trim(); if(!n){ alert('填姓名'); return; }
   DB.accounts.push({id:uid(), name:n, role:document.getElementById('acRole').value, pwd:document.getElementById('acPwd').value||'123456'});
   save(); renderAccounts(); fillSelects();
 }
-function delAccount(id){ DB.accounts=DB.accounts.filter(function(a){return a.id!==id;}); save(); renderAccounts(); fillSelects(); }
+function delAccount(id){
+  var a = DB.accounts.filter(function(x){ return x.id===id; })[0];
+  if(a && a.builtin){ alert('「'+a.name+'」是系统内置的账号，不能删除（可以改名）。'); return; }
+  if(ME && ME.id===id){ alert('不能删除当前登录的账号。'); return; }
+  DB.accounts=DB.accounts.filter(function(a){return a.id!==id;}); save(); renderAccounts(); fillSelects(); fillLoginAcc(); }
 
 function doImport(){
   var txt = document.getElementById('impText').value.trim();
@@ -1244,17 +1244,19 @@ function exportJSON(){
 }
 function importJSON(inp){
   var f=inp.files[0]; if(!f) return; var r=new FileReader();
-  r.onload=function(){ try{ DB=JSON.parse(r.result); save(); alert('导入成功'); initUI(); }catch(e){ alert('文件格式不对'); } };
+  r.onload=function(){ try{ DB=JSON.parse(r.result); if(!DB.accounts) DB.accounts=[]; ensureBuiltinAccounts();
+    save(); alert('导入成功'); initUI(); fillLoginAcc(); }catch(e){ alert('文件格式不对'); } };
   r.readAsText(f); inp.value='';
 }
-function loadSeed(){ if(!confirm('会用示例数据覆盖当前数据，确定？')) return; DB=seed(); save(); initUI(); }
+function loadSeed(){ if(!confirm('会用示例数据覆盖当前数据，确定？')) return; DB=seed(); ensureBuiltinAccounts(); save(); initUI(); fillLoginAcc(); }
 function clearAll(){ if(!confirm('确定清空全部数据？建议先导出备份。')) return;
   if(!confirm('再确认一次：清空后不可恢复。')) return;
-  DB={students:[],courses:[],schedule:[],attendance:[],accounts:DB.accounts||[],subjectColors:{}}; save(); initUI(); }
+  DB={students:[],courses:[],schedule:[],attendance:[],accounts:[],subjectColors:{}};
+  ensureBuiltinAccounts(); save(); initUI(); fillLoginAcc(); }
 
 /* ================= 启动 ================= */
 load();
-loadCloudCfg();
+fillLoginAcc();
 </script>
 </body>
 </html>

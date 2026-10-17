@@ -2,3 +2,4 @@
 工作台-本地含课表.html
 工作簿1.xlsx
 *.xlsx
+.wb.bak.*
